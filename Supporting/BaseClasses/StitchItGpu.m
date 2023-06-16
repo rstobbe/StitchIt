@@ -290,7 +290,7 @@ classdef StitchItGpu < handle
                 end
                 sz(4) = 1;
             else
-                if sz(4) ~= (obj.ChanPerGpu * obj.NumGpuUsed)
+                if sz(4) > (obj.ChanPerGpu * obj.NumGpuUsed)
                     error('RcvrProfs dimensionality problem');
                 end
             end
@@ -306,7 +306,7 @@ classdef StitchItGpu < handle
                     GpuNum = uint64(m-1);
                     ChanNum = (p-1)*obj.NumGpuUsed+m;
                     if ChanNum > sz(4)
-                        error('Image array greater than number of channels specified');
+                        break
                     end
                     [Error] = func(GpuNum,obj.HRcvrProfMatrix(p,:),RcvrProfs(:,:,:,ChanNum));                  
                     if not(strcmp(Error,'no error'))
