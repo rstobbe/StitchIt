@@ -372,7 +372,8 @@ classdef StitchItGpu < handle
                 error('Specified ''GpuNum'' beyond number of GPUs used');
             end
             GpuNum = uint64(GpuNum);
-            func = str2func(['GridSampDat',obj.CompCap]);
+            %func = str2func(['GridSampDat',obj.CompCap]);
+            func = str2func(['GridSampDat256',obj.CompCap]);
             [Error] = func(GpuNum,obj.HSampDat(1,:),obj.HReconInfo,obj.HKernel,obj.HKspaceMatrix(1,:),...
                                     obj.SampDatMemDims,obj.KernelMemDims,obj.GridImageMatrixMemDims,obj.iKern,obj.KernHw);
             if not(strcmp(Error,'no error'))
