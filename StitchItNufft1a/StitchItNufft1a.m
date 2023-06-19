@@ -16,6 +16,7 @@ classdef StitchItNufft1a < handle
         ReconRxBatches
         ReconRxBatchLen
         RxProfs
+        TestTime
     end
     
     methods 
@@ -109,6 +110,8 @@ classdef StitchItNufft1a < handle
                         obj.StitchIt.LoadSampDatGpuMemAsync(GpuNum,Data(:,:,ChanNum));
                     end  
                     obj.StitchIt.InitializeGridMatricesGpuMem;
+                    obj.StitchIt.CudaDeviceWait(1);
+                    tic
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
                         ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
@@ -117,6 +120,9 @@ classdef StitchItNufft1a < handle
                         end    
                         obj.StitchIt.GridSampDat(GpuNum);
                     end
+                    obj.StitchIt.CudaDeviceWait(1);
+                    obj.TestTime = [obj.TestTime toc];
+                    TestAveTime = mean(obj.TestTime)
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
                         ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
