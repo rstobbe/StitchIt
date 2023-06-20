@@ -16,7 +16,6 @@ classdef StitchItNufft1a < handle
         ReconRxBatches
         ReconRxBatchLen
         RxProfs
-        TestTime
     end
     
     methods 
@@ -106,12 +105,10 @@ classdef StitchItNufft1a < handle
                         ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
-                        end    
-                        obj.StitchIt.LoadSampDatGpuMemAsync(GpuNum,Data(:,:,ChanNum));
+                        end
+                        obj.StitchIt.LoadSampDatGpuMemAsyncCidx(GpuNum,Data,ChanNum);
                     end  
                     obj.StitchIt.InitializeGridMatricesGpuMem;
-                    obj.StitchIt.CudaDeviceWait(1);
-                    tic
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
                         ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
@@ -119,17 +116,6 @@ classdef StitchItNufft1a < handle
                             break
                         end    
                         obj.StitchIt.GridSampDat(GpuNum);
-                    end
-                    obj.StitchIt.CudaDeviceWait(1);
-                    obj.TestTime = [obj.TestTime toc];
-                    TestAveTime = mean(obj.TestTime)
-                    for m = 1:obj.NumGpuUsed
-                        GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
-                        if ChanNum > obj.RxChannels
-                            break
-                        end   
-                        obj.StitchIt.InverseKspaceScaleCorrect(GpuNum); 
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -178,6 +164,8 @@ classdef StitchItNufft1a < handle
                 end
             end
             Image = sum(ImageArray,[4 5]);
+            Scale = 1/obj.StitchIt.ConvScaleVal * single(obj.StitchIt.BaseImageMatrixMemDims(1)).^1.5 / single(obj.StitchIt.GridImageMatrixMemDims(1))^3;
+            Image = Image*Scale;
         end           
 
 %==================================================================

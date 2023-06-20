@@ -259,8 +259,31 @@ classdef StitchItGpu < handle
 % LoadSampDatGpuMemAsync
 %   - SampDat: read x proj
 %   - function loads SampDat on one GPU asynchronously
+%   - Use Below
 %================================================================== 
-        function LoadSampDatGpuMemAsync(obj,LoadGpuNum,SampDat)
+%         function LoadSampDatGpuMemAsync(obj,LoadGpuNum,SampDat)
+%             if LoadGpuNum > obj.NumGpuUsed-1
+%                 error('Specified ''LoadGpuNum'' beyond number of GPUs used');
+%             end
+%             LoadGpuNum = uint64(LoadGpuNum);
+%             if ~isa(SampDat,'single')
+%                 error('SampDat must be in single format');
+%             end
+%             func = str2func(['LoadSampDatGpuMemAsync',obj.CompCap]);
+%             %func = str2func(['LoadSampDatGpuMemAsyncRI',obj.CompCap]);             % old
+%             [Error] = func(LoadGpuNum,obj.HSampDat(1,:),SampDat);
+%             if not(strcmp(Error,'no error'))
+%                 error(Error);
+%             end
+%         end   
+
+%==================================================================
+% LoadSampDatGpuMemAsyncCidx
+%   - SampDat: read x proj
+%   - function loads SampDat on one GPU asynchronously
+%   - Index in C
+%================================================================== 
+        function LoadSampDatGpuMemAsyncCidx(obj,LoadGpuNum,SampDat,ChanNum)
             if LoadGpuNum > obj.NumGpuUsed-1
                 error('Specified ''LoadGpuNum'' beyond number of GPUs used');
             end
@@ -268,14 +291,14 @@ classdef StitchItGpu < handle
             if ~isa(SampDat,'single')
                 error('SampDat must be in single format');
             end
-            func = str2func(['LoadSampDatGpuMemAsync',obj.CompCap]);
-            %func = str2func(['LoadSampDatGpuMemAsyncRI',obj.CompCap]);             % old
-            [Error] = func(LoadGpuNum,obj.HSampDat(1,:),SampDat);
+            ChanNum = uint64(ChanNum);
+            func = str2func(['LoadSampDatGpuMemAsyncCidx',obj.CompCap]);
+            [Error] = func(LoadGpuNum,obj.HSampDat(1,:),SampDat,ChanNum);
             if not(strcmp(Error,'no error'))
                 error(Error);
             end
-        end   
-
+        end         
+        
 %==================================================================
 % LoadRcvrProfMatricesGpuMum
 %================================================================== 
@@ -435,7 +458,8 @@ classdef StitchItGpu < handle
                 error('Specified ''GpuNum'' beyond number of GPUs used');
             end
             GpuNum = uint64(GpuNum);
-            func = str2func(['ExecuteInverseFourierTransformSingleGpu',obj.CompCap]);
+            %func = str2func(['ExecuteInverseFourierTransformSingleGpu',obj.CompCap]);
+            func = str2func(['ExecuteInverseFourierTransformSingleGpuNoScale',obj.CompCap]);
             [Error] = func(GpuNum,obj.HGridImageMatrix(1,:),obj.HKspaceMatrix(1,:),obj.HFourierTransformPlan,obj.GridImageMatrixMemDims);  
             if not(strcmp(Error,'no error'))
                 error(Error);
@@ -474,19 +498,21 @@ classdef StitchItGpu < handle
 
 %==================================================================
 % InverseKspaceScaleCorrect
+%   **  Do not use. Excessively slow
 %==================================================================         
-        function InverseKspaceScaleCorrect(obj,GpuNum)
-            if GpuNum > obj.NumGpuUsed-1
-                error('Specified ''GpuNum'' beyond number of GPUs used');
-            end
-            GpuNum = uint64(GpuNum);
-            Scale = single((1/obj.ConvScaleVal) * double(obj.BaseImageMatrixMemDims(1)).^1.5);
-            func = str2func(['ScaleComplexMatrixSingleGpu',obj.CompCap]);
-            [Error] = func(GpuNum,obj.HKspaceMatrix(1,:),Scale,obj.GridImageMatrixMemDims);  
-            if not(strcmp(Error,'no error'))
-                error(Error);
-            end
-        end           
+%         function InverseKspaceScaleCorrect(obj,GpuNum)
+%             error('Do not use - excessively slow');
+%             if GpuNum > obj.NumGpuUsed-1
+%                 error('Specified ''GpuNum'' beyond number of GPUs used');
+%             end
+%             GpuNum = uint64(GpuNum);
+%             Scale = single((1/obj.ConvScaleVal) * double(obj.BaseImageMatrixMemDims(1)).^1.5);
+%             func = str2func(['ScaleComplexMatrixSingleGpu',obj.CompCap]);
+%             [Error] = func(GpuNum,obj.HKspaceMatrix(1,:),Scale,obj.GridImageMatrixMemDims);  
+%             if not(strcmp(Error,'no error'))
+%                 error(Error);
+%             end
+%         end           
 
 %==================================================================
 % ForwardKspaceScaleCorrect
