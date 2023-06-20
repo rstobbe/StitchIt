@@ -16,6 +16,7 @@ classdef StitchItNufft1a < handle
         ReconRxBatches
         ReconRxBatchLen
         RxProfs
+        TestTime
     end
     
     methods 
@@ -87,6 +88,7 @@ classdef StitchItNufft1a < handle
 %   - weight kern properly - take out scaling...
 %================================================================== 
         function Image = Inverse(obj,Data)
+            tic
             ImageArray = complex(zeros([obj.Options.BaseMatrix obj.Options.BaseMatrix obj.Options.BaseMatrix,obj.ReconRxBatches,obj.NumGpuUsed],'single'),0);
             for q = 1:obj.ReconRxBatches 
                 RbStart = (q-1)*obj.ReconRxBatchLen + 1;
@@ -166,6 +168,8 @@ classdef StitchItNufft1a < handle
             Image = sum(ImageArray,[4 5]);
             Scale = 1/obj.StitchIt.ConvScaleVal * single(obj.StitchIt.BaseImageMatrixMemDims(1)).^1.5 / single(obj.StitchIt.GridImageMatrixMemDims(1))^3;
             Image = Image*Scale;
+            obj.TestTime = [obj.TestTime toc];
+            TestTotalTime = sum(obj.TestTime)
         end           
 
 %==================================================================
