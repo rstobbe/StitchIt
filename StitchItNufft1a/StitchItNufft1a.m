@@ -186,8 +186,8 @@ classdef StitchItNufft1a < handle
 %   - some Cuda efficiency coding to be done still
 %==================================================================         
         function Data = Forward(obj,Image)
-            tic
-            Data = complex(zeros([obj.AcqInfo.NumCol,obj.AcqInfo.NumTraj,obj.ChanPerGpu],'single'),0);
+%             tic
+            Data = complex(zeros([obj.AcqInfo.NumCol,obj.AcqInfo.NumTraj,obj.RxChannels],'single'),0);
             obj.StitchIt.LoadImageMatrixGpuMem(Image);
             for q = 1:obj.ReconRxBatches 
                 RbStart = (q-1)*obj.ReconRxBatchLen + 1;
@@ -200,6 +200,7 @@ classdef StitchItNufft1a < handle
                     obj.StitchIt.LoadRcvrProfMatricesGpuMum(obj.RxProfs(:,:,:,Rcvrs));
                 end
                 for p = 1:obj.ChanPerGpu 
+                    %tic
                     obj.StitchIt.InitializeGridMatricesGpuMem;
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -249,21 +250,26 @@ classdef StitchItNufft1a < handle
                         end    
                         obj.StitchIt.ReverseGrid(GpuNum);
                     end
+                    obj.StitchIt.CudaDeviceWait(1);
+                    tic 
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
                         ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        Data(:,:,ChanNum) = obj.StitchIt.ReturnSampDat(GpuNum);
+                        obj.StitchIt.ReturnSampDatCidx(GpuNum,Data,ChanNum);
                     end
+                    obj.StitchIt.CudaDeviceWait(1);
+                    obj.TestTime = [obj.TestTime toc];
+                    TestTotalTime = sum(obj.TestTime)
                 end
             end
             Scale = single(1/(obj.StitchIt.ConvScaleVal * obj.StitchIt.SubSamp.^3 * double(obj.StitchIt.BaseImageMatrixMemDims(1)).^1.5));
             Data = Data*Scale;
-            obj.StitchIt.CudaDeviceWait(1);
-            obj.TestTime = [obj.TestTime toc];
-            TestTotalTime = sum(obj.TestTime)
+%             obj.StitchIt.CudaDeviceWait(1);
+%             obj.TestTime = [obj.TestTime toc];
+%             TestTotalTime = sum(obj.TestTime)
         end
         
 %==================================================================

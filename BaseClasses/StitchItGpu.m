@@ -633,6 +633,22 @@ classdef StitchItGpu < handle
                 error(Error);
             end
         end         
+ 
+%==================================================================
+% ReturnSampDatCidx
+%================================================================== 
+        function ReturnSampDatCidx(obj,GpuNum,SampDat,ChanNum)
+            if GpuNum > obj.NumGpuUsed-1
+                error('Specified ''GpuNum'' beyond number of GPUs used');
+            end
+            GpuNum = uint64(GpuNum);
+            ChanNum = uint64(ChanNum);
+            func = str2func(['ReturnSampDatSingleGpuCidx',obj.CompCap]);
+            [Error] = func(GpuNum,obj.HSampDat(1,:),SampDat,ChanNum);
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end       
         
 %==================================================================
 % ReturnFov
