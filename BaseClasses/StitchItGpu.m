@@ -501,7 +501,6 @@ classdef StitchItGpu < handle
 %   **  Do not use. Excessively slow
 %==================================================================         
 %         function InverseKspaceScaleCorrect(obj,GpuNum)
-%             error('Do not use - excessively slow');
 %             if GpuNum > obj.NumGpuUsed-1
 %                 error('Specified ''GpuNum'' beyond number of GPUs used');
 %             end
@@ -516,19 +515,20 @@ classdef StitchItGpu < handle
 
 %==================================================================
 % ForwardKspaceScaleCorrect
+%   **  Do not use. Excessively slow
 %==================================================================         
-        function ForwardKspaceScaleCorrect(obj,GpuNum)
-            if GpuNum > obj.NumGpuUsed-1
-                error('Specified ''GpuNum'' beyond number of GPUs used');
-            end
-            GpuNum = uint64(GpuNum);
-            Scale = single(1/(obj.ConvScaleVal * obj.SubSamp.^3 * double(obj.BaseImageMatrixMemDims(1)).^1.5));
-            func = str2func(['ScaleComplexMatrixSingleGpu',obj.CompCap]);
-            [Error] = func(GpuNum,obj.HKspaceMatrix(1,:),Scale,obj.GridImageMatrixMemDims);  
-            if not(strcmp(Error,'no error'))
-                error(Error);
-            end
-        end        
+%         function ForwardKspaceScaleCorrect(obj,GpuNum)
+%             if GpuNum > obj.NumGpuUsed-1
+%                 error('Specified ''GpuNum'' beyond number of GPUs used');
+%             end
+%             GpuNum = uint64(GpuNum);
+%             Scale = single(1/(obj.ConvScaleVal * obj.SubSamp.^3 * double(obj.BaseImageMatrixMemDims(1)).^1.5));
+%             func = str2func(['ScaleComplexMatrixSingleGpu',obj.CompCap]);
+%             [Error] = func(GpuNum,obj.HKspaceMatrix(1,:),Scale,obj.GridImageMatrixMemDims);  
+%             if not(strcmp(Error,'no error'))
+%                 error(Error);
+%             end
+%         end        
         
 %==================================================================
 % AccumulateImage

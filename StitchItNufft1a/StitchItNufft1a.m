@@ -88,7 +88,7 @@ classdef StitchItNufft1a < handle
 %   - weight kern properly - take out scaling...
 %================================================================== 
         function Image = Inverse(obj,Data)
-            tic
+%             tic
             ImageArray = complex(zeros([obj.Options.BaseMatrix obj.Options.BaseMatrix obj.Options.BaseMatrix,obj.ReconRxBatches,obj.NumGpuUsed],'single'),0);
             for q = 1:obj.ReconRxBatches 
                 RbStart = (q-1)*obj.ReconRxBatchLen + 1;
@@ -102,6 +102,7 @@ classdef StitchItNufft1a < handle
                 end
                 obj.StitchIt.InitializeBaseMatricesGpuMem;
                 for p = 1:obj.ChanPerGpu
+%                     tic
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
                         ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
@@ -159,17 +160,24 @@ classdef StitchItNufft1a < handle
                         end 
                         obj.StitchIt.AccumulateImage(GpuNum,p);
                     end
+%                     obj.StitchIt.CudaDeviceWait(1);
+%                     obj.TestTime = [obj.TestTime toc];
+%                     TestTotalTime = sum(obj.TestTime)
                 end
+%                 tic
                 for m = 1:obj.NumGpuUsed
                     GpuNum = m-1;
                 	ImageArray(:,:,:,q,m) = obj.StitchIt.ReturnBaseImage(GpuNum);
                 end
+%                 obj.StitchIt.CudaDeviceWait(1);
+%                 obj.TestTime = [obj.TestTime toc];
+%                 TestTotalTime = sum(obj.TestTime)
             end
             Image = sum(ImageArray,[4 5]);
             Scale = 1/obj.StitchIt.ConvScaleVal * single(obj.StitchIt.BaseImageMatrixMemDims(1)).^1.5 / single(obj.StitchIt.GridImageMatrixMemDims(1))^3;
             Image = Image*Scale;
-            obj.TestTime = [obj.TestTime toc];
-            TestTotalTime = sum(obj.TestTime)
+%             obj.TestTime = [obj.TestTime toc];
+%             TestTotalTime = sum(obj.TestTime)
         end           
 
 %==================================================================
@@ -178,6 +186,7 @@ classdef StitchItNufft1a < handle
 %   - some Cuda efficiency coding to be done still
 %==================================================================         
         function Data = Forward(obj,Image)
+            tic
             Data = complex(zeros([obj.AcqInfo.NumCol,obj.AcqInfo.NumTraj,obj.ChanPerGpu],'single'),0);
             obj.StitchIt.LoadImageMatrixGpuMem(Image);
             for q = 1:obj.ReconRxBatches 
@@ -237,14 +246,6 @@ classdef StitchItNufft1a < handle
                         ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
-                        end   
-                        obj.StitchIt.ForwardKspaceScaleCorrect(GpuNum); 
-                    end
-                    for m = 1:obj.NumGpuUsed
-                        GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
-                        if ChanNum > obj.RxChannels
-                            break
                         end    
                         obj.StitchIt.ReverseGrid(GpuNum);
                     end
@@ -258,6 +259,11 @@ classdef StitchItNufft1a < handle
                     end
                 end
             end
+            Scale = single(1/(obj.StitchIt.ConvScaleVal * obj.StitchIt.SubSamp.^3 * double(obj.StitchIt.BaseImageMatrixMemDims(1)).^1.5));
+            Data = Data*Scale;
+            obj.StitchIt.CudaDeviceWait(1);
+            obj.TestTime = [obj.TestTime toc];
+            TestTotalTime = sum(obj.TestTime)
         end
         
 %==================================================================
