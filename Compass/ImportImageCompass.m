@@ -4,6 +4,17 @@
 
 function ImportImageCompass(Image,Name)
 
+    Compass = 0;
+    Test = whos('global');
+    for n = 1:length(Test)
+        if strcmp(Test(n).name,'TOTALGBL')
+            Compass = 1;
+        end
+    end
+    if Compass == 0
+        return
+    end
+
     IMG.Im = Image;  
     IMG.ExpPars = [];
 

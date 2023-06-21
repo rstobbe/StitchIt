@@ -2,6 +2,9 @@
 /// 
 ///==========================================================
 
+extern "C" void CudaHostMemRegister(float *Mat, mwSize *ArrSz, char *Error);
+extern "C" void CudaHostMemRegisterC(float *Mat, mwSize *ArrSz, char *Error);
+extern "C" void CudaHostMemUnRegister(float *Mat, char *Error);
 extern "C" void CudaDeviceWait(mwSize *GpuNum, char *Error);
 extern "C" void ArrAllocSglAll(mwSize *GpuTot, size_t *HMat, mwSize *ArrSz, char *Error);
 extern "C" void ArrAllocSglAllC(mwSize *GpuTot, mwSize *HMat, mwSize *ArrSz, char *Error);

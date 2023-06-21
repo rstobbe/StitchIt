@@ -344,9 +344,9 @@ classdef StitchItGpu < handle
 %================================================================== 
         function LoadImageMatrixGpuMem(obj,Image)
             sz = size(Image);
-            if length(sz) ~= 3
-                error('Image dimensionality problem');
-            end
+%             if length(sz) ~= 3
+%                 error('Image dimensionality problem');
+%             end
             if sum(sz(1:3)) ~= sum(obj.BaseImageMatrixMemDims)
                 error('Image dimensionality problem');
             end
@@ -618,6 +618,22 @@ classdef StitchItGpu < handle
             end
         end         
 
+%==================================================================
+% ReturnBaseImageCidx
+%================================================================== 
+        function ReturnBaseImageCidx(obj,GpuNum,ImageMatrix,ChanNum)
+            if GpuNum > obj.NumGpuUsed-1
+                error('Specified ''GpuNum'' beyond number of GPUs used');
+            end
+            GpuNum = uint64(GpuNum);
+            ChanNum = uint64(ChanNum);
+            func = str2func(['ReturnComplexMatrixSingleGpuCidx',obj.CompCap]);
+            [Error] = func(GpuNum,obj.HBaseImageMatrix(1,:),ImageMatrix,ChanNum);
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end         
+        
 %==================================================================
 % ReturnSampDat
 %================================================================== 

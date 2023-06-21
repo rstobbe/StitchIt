@@ -55,9 +55,6 @@ SampDatChanIdx = SampDat + (ChanNum[0]-1)*ArrLen[0]*2;
 // Load SampDat         
 //-------------------------------------
 ArrLoadSglOneAsyncC(GpuNum,SampDatChanIdx,HSampDat,ArrLen,Error);
-if (strcmp(Error,"no error") != 0) {
-	plhs[0] = mxCreateString(Error); return;
-	}
 
 //-------------------------------------
 // Return Error                    

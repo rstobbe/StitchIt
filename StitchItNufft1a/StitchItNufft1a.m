@@ -17,6 +17,10 @@ classdef StitchItNufft1a < handle
         ReconRxBatchLen
         RxProfs
         TestTime
+        ImageMemPin
+        DataMemPin
+        NumRunsInverse
+        NumRunsForward
     end
     
     methods 
@@ -79,6 +83,8 @@ classdef StitchItNufft1a < handle
             else
                 obj.RxProfs = RxProfs;
             end 
+            obj.NumRunsInverse = 0;
+            obj.NumRunsForward = 0;
         end      
 
 %==================================================================
@@ -89,7 +95,18 @@ classdef StitchItNufft1a < handle
 %================================================================== 
         function Image = Inverse(obj,Data)
 %             tic
-            ImageArray = complex(zeros([obj.Options.BaseMatrix obj.Options.BaseMatrix obj.Options.BaseMatrix,obj.ReconRxBatches,obj.NumGpuUsed],'single'),0);
+            Error = RegisterHostComplexMemCuda61(Data);
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+            if obj.NumRunsInverse == 0 
+                obj.ImageMemPin = complex(zeros([obj.Options.BaseMatrix obj.Options.BaseMatrix obj.Options.BaseMatrix,obj.ReconRxBatches*obj.NumGpuUsed],'single'),0);
+                Error = RegisterHostComplexMemCuda61(obj.ImageMemPin);
+                if not(strcmp(Error,'no error'))
+                    error(Error);
+                end
+            end
+            obj.NumRunsInverse = obj.NumRunsInverse+1;
             for q = 1:obj.ReconRxBatches 
                 RbStart = (q-1)*obj.ReconRxBatchLen + 1;
                 RbStop = q*obj.ReconRxBatchLen;
@@ -102,6 +119,8 @@ classdef StitchItNufft1a < handle
                 end
                 obj.StitchIt.InitializeBaseMatricesGpuMem;
                 for p = 1:obj.ChanPerGpu
+%---
+%                     obj.StitchIt.CudaDeviceWait(1);
 %                     tic
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -110,7 +129,10 @@ classdef StitchItNufft1a < handle
                             break
                         end
                         obj.StitchIt.LoadSampDatGpuMemAsyncCidx(GpuNum,Data,ChanNum);
-                    end  
+                    end 
+%                     obj.StitchIt.CudaDeviceWait(1);
+%                     toc
+%---
                     obj.StitchIt.InitializeGridMatricesGpuMem;
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -160,24 +182,30 @@ classdef StitchItNufft1a < handle
                         end 
                         obj.StitchIt.AccumulateImage(GpuNum,p);
                     end
-%                     obj.StitchIt.CudaDeviceWait(1);
-%                     obj.TestTime = [obj.TestTime toc];
-%                     TestTotalTime = sum(obj.TestTime)
                 end
+                obj.StitchIt.CudaDeviceWait(0);
+                obj.StitchIt.CudaDeviceWait(1);
+%---
+%                 obj.StitchIt.CudaDeviceWait(1);
 %                 tic
                 for m = 1:obj.NumGpuUsed
                     GpuNum = m-1;
-                	ImageArray(:,:,:,q,m) = obj.StitchIt.ReturnBaseImage(GpuNum);
+                    ReturnNum = (q-1)*obj.ReconRxBatches + m;
+                    obj.StitchIt.ReturnBaseImageCidx(GpuNum,obj.ImageMemPin,ReturnNum);
                 end
 %                 obj.StitchIt.CudaDeviceWait(1);
-%                 obj.TestTime = [obj.TestTime toc];
-%                 TestTotalTime = sum(obj.TestTime)
+%                 toc
+%---
             end
-            Image = sum(ImageArray,[4 5]);
+            obj.StitchIt.CudaDeviceWait(0);
+            obj.StitchIt.CudaDeviceWait(1);
+            Image = sum(obj.ImageMemPin,4);
             Scale = 1/obj.StitchIt.ConvScaleVal * single(obj.StitchIt.BaseImageMatrixMemDims(1)).^1.5 / single(obj.StitchIt.GridImageMatrixMemDims(1))^3;
             Image = Image*Scale;
-%             obj.TestTime = [obj.TestTime toc];
-%             TestTotalTime = sum(obj.TestTime)
+            Error = UnRegisterHostMemCuda61(Data);
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
         end           
 
 %==================================================================
@@ -187,8 +215,25 @@ classdef StitchItNufft1a < handle
 %==================================================================         
         function Data = Forward(obj,Image)
 %             tic
-            Data = complex(zeros([obj.AcqInfo.NumCol,obj.AcqInfo.NumTraj,obj.RxChannels],'single'),0);
+            Error = RegisterHostComplexMemCuda61(Image);
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+            if obj.NumRunsForward == 0 
+                obj.DataMemPin = complex(zeros([obj.AcqInfo.NumCol,obj.AcqInfo.NumTraj,obj.RxChannels],'single'),0);
+                Error = RegisterHostComplexMemCuda61(obj.DataMemPin);
+                if not(strcmp(Error,'no error'))
+                    error(Error);
+                end
+            end
+            obj.NumRunsForward = obj.NumRunsForward+1;
+%---
+%             obj.StitchIt.CudaDeviceWait(1);
+%             tic
             obj.StitchIt.LoadImageMatrixGpuMem(Image);
+%             obj.StitchIt.CudaDeviceWait(1);
+%             toc
+%---
             for q = 1:obj.ReconRxBatches 
                 RbStart = (q-1)*obj.ReconRxBatchLen + 1;
                 RbStop = q*obj.ReconRxBatchLen;
@@ -200,7 +245,6 @@ classdef StitchItNufft1a < handle
                     obj.StitchIt.LoadRcvrProfMatricesGpuMum(obj.RxProfs(:,:,:,Rcvrs));
                 end
                 for p = 1:obj.ChanPerGpu 
-                    %tic
                     obj.StitchIt.InitializeGridMatricesGpuMem;
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -250,34 +294,55 @@ classdef StitchItNufft1a < handle
                         end    
                         obj.StitchIt.ReverseGrid(GpuNum);
                     end
+                    obj.StitchIt.CudaDeviceWait(0);
                     obj.StitchIt.CudaDeviceWait(1);
-                    tic 
+%---
+%                     obj.StitchIt.CudaDeviceWait(1);
+%                     tic 
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
                         ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        obj.StitchIt.ReturnSampDatCidx(GpuNum,Data,ChanNum);
+                        obj.StitchIt.ReturnSampDatCidx(GpuNum,obj.DataMemPin,ChanNum);
                     end
-                    obj.StitchIt.CudaDeviceWait(1);
-                    obj.TestTime = [obj.TestTime toc];
-                    TestTotalTime = sum(obj.TestTime)
+%                     obj.StitchIt.CudaDeviceWait(1);
+%                     toc
+%---
                 end
             end
+            obj.StitchIt.CudaDeviceWait(0);
+            obj.StitchIt.CudaDeviceWait(1);
             Scale = single(1/(obj.StitchIt.ConvScaleVal * obj.StitchIt.SubSamp.^3 * double(obj.StitchIt.BaseImageMatrixMemDims(1)).^1.5));
-            Data = Data*Scale;
+            Data = obj.DataMemPin*Scale;
+            Error = UnRegisterHostMemCuda61(Image);
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end 
 %             obj.StitchIt.CudaDeviceWait(1);
 %             obj.TestTime = [obj.TestTime toc];
 %             TestTotalTime = sum(obj.TestTime)
         end
         
 %==================================================================
-% Finish
+% Destructor
 %================================================================== 
-        function Finish(obj)
+        function delete(obj)
+            if not(isempty(obj.DataMemPin))
+                Error = UnRegisterHostMemCuda61(obj.DataMemPin);
+                if not(strcmp(Error,'no error'))
+                    error(Error);
+                end
+            end
+            if not(isempty(obj.ImageMemPin))
+                Error = UnRegisterHostMemCuda61(obj.ImageMemPin);
+                if not(strcmp(Error,'no error'))
+                    error(Error);
+                end
+            end
             obj.StitchIt.FreeGpuMem;
-        end
+        end        
         
     end
 end
