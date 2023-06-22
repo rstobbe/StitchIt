@@ -20,6 +20,7 @@ properties (SetAccess = private)
     Vox
     kMaxRad
     ReconInfoMat
+    DataOrder
 end
 
 methods 
@@ -74,6 +75,9 @@ function SetkMaxRad(STCH,kMaxRad)
 end
 function SetReconInfoMat(STCH,ReconInfoMat)     
     STCH.ReconInfoMat = ReconInfoMat;
+end
+function SetDataOrder(STCH,DataOrder)     
+    STCH.DataOrder = DataOrder;
 end
 
 
