@@ -2,7 +2,12 @@
 % CompassImageCompass
 %================================================================== 
 
-function ImportImageCompass(Image,Name)
+function ImportImageCompass(Image,Name,Save,Path)
+
+    if nargin < 3
+        Save = 0;
+        Path = [];
+    end
 
     Compass = 0;
     Test = whos('global');
@@ -38,7 +43,7 @@ function ImportImageCompass(Image,Name)
     IMDISP = ImagingPlotSetup(INPUT);
     IMG.IMDISP = IMDISP;
     IMG.type = 'Image';
-    IMG.path = '';
+    IMG.path = Path;
     IMG.name = ['IMG_',Name];
 
     %----------------------------------------------
@@ -49,11 +54,13 @@ function ImportImageCompass(Image,Name)
     from = 'CompassLoad';
     Load_TOTALGBL(totalgbl,'IM',from);
 
-%     %----------------------------------------------
-%     % Save
-%     %----------------------------------------------
-%     saveData.IMG = IMG;
-%     save([IMG.path,IMG.name],'saveData');
+    %----------------------------------------------
+    % Save
+    %----------------------------------------------
+    if Save == 1
+        saveData.IMG = IMG;
+        save([IMG.path,IMG.name],'saveData');
+    end
     
 end
 
