@@ -183,8 +183,10 @@ classdef StitchItNufft1a < handle
                         obj.StitchIt.AccumulateImage(GpuNum,p);
                     end
                 end
-                obj.StitchIt.CudaDeviceWait(0);
-                obj.StitchIt.CudaDeviceWait(1);
+                for m = 1:obj.NumGpuUsed
+                    GpuNum = m-1;
+                    obj.StitchIt.CudaDeviceWait(GpuNum);
+                end
 %---
 %                 obj.StitchIt.CudaDeviceWait(1);
 %                 tic
@@ -197,8 +199,10 @@ classdef StitchItNufft1a < handle
 %                 toc
 %---
             end
-            obj.StitchIt.CudaDeviceWait(0);
-            obj.StitchIt.CudaDeviceWait(1);
+            for m = 1:obj.NumGpuUsed
+                GpuNum = m-1;
+                obj.StitchIt.CudaDeviceWait(GpuNum);
+            end
             Image = sum(obj.ImageMemPin,4);
             Scale = 1/obj.StitchIt.ConvScaleVal * single(obj.StitchIt.BaseImageMatrixMemDims(1)).^1.5 / single(obj.StitchIt.GridImageMatrixMemDims(1))^3;
             Image = Image*Scale;
@@ -294,8 +298,10 @@ classdef StitchItNufft1a < handle
                         end    
                         obj.StitchIt.ReverseGrid(GpuNum);
                     end
-                    obj.StitchIt.CudaDeviceWait(0);
-                    obj.StitchIt.CudaDeviceWait(1);
+                    for m = 1:obj.NumGpuUsed
+                        GpuNum = m-1;
+                        obj.StitchIt.CudaDeviceWait(GpuNum);
+                    end
 %---
 %                     obj.StitchIt.CudaDeviceWait(1);
 %                     tic 
@@ -312,8 +318,10 @@ classdef StitchItNufft1a < handle
 %---
                 end
             end
-            obj.StitchIt.CudaDeviceWait(0);
-            obj.StitchIt.CudaDeviceWait(1);
+            for m = 1:obj.NumGpuUsed
+                GpuNum = m-1;
+                obj.StitchIt.CudaDeviceWait(GpuNum);
+            end
             Scale = single(1/(obj.StitchIt.ConvScaleVal * obj.StitchIt.SubSamp.^3 * double(obj.StitchIt.BaseImageMatrixMemDims(1)).^1.5));
             Data = obj.DataMemPin*Scale;
             Error = UnRegisterHostMemCuda61(Image);
