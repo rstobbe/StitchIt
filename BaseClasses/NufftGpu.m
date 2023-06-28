@@ -1,4 +1,4 @@
-classdef StitchItGpu < handle
+classdef NufftGpu < handle
 
     properties (SetAccess = private)                    
         GpuParams; CompCap; NumGpuUsed; ChanPerGpu;       
@@ -16,7 +16,7 @@ classdef StitchItGpu < handle
 %==================================================================
 % Constructor
 %==================================================================   
-        function obj = StitchItGpu()           
+        function obj = NufftGpu()           
             obj.GpuParams = gpuDevice; 
         end        
         
@@ -574,49 +574,65 @@ classdef StitchItGpu < handle
 %% Utilities           
 
 %==================================================================
-% ReturnGridImage
+% ReturnKspace (old) - make Cidx version
 %================================================================== 
-        function ImageMatrix = ReturnGridImage(obj,GpuNum)
-            if GpuNum > obj.NumGpuUsed-1
-                error('Specified ''GpuNum'' beyond number of GPUs used');
-            end
-            GpuNum = uint64(GpuNum);
-            func = str2func(['ReturnComplexMatrixSingleGpu',obj.CompCap]);
-            [ImageMatrix,Error] = func(GpuNum,obj.HGridImageMatrix(1,:),obj.GridImageMatrixMemDims);
-            if not(strcmp(Error,'no error'))
-                error(Error);
-            end
-        end 
+%         function KspaceMatrix = ReturnKspace(obj,GpuNum)
+%             if GpuNum > obj.NumGpuUsed-1
+%                 error('Specified ''GpuNum'' beyond number of GPUs used');
+%             end
+%             GpuNum = uint64(GpuNum);
+%             func = str2func(['ReturnComplexMatrixSingleGpu',obj.CompCap]);
+%             [KspaceMatrix,Error] = func(GpuNum,obj.HKspaceMatrix(1,:),obj.GridImageMatrixMemDims);
+%             if not(strcmp(Error,'no error'))
+%                 error(Error);
+%             end
+%         end  
 
 %==================================================================
-% ReturnKspace
+% ReturnGridImage (old)
 %================================================================== 
-        function KspaceMatrix = ReturnKspace(obj,GpuNum)
+%         function ImageMatrix = ReturnGridImage(obj,GpuNum)
+%             if GpuNum > obj.NumGpuUsed-1
+%                 error('Specified ''GpuNum'' beyond number of GPUs used');
+%             end
+%             GpuNum = uint64(GpuNum);
+%             func = str2func(['ReturnComplexMatrixSingleGpu',obj.CompCap]);
+%             [ImageMatrix,Error] = func(GpuNum,obj.HGridImageMatrix(1,:),obj.GridImageMatrixMemDims);
+%             if not(strcmp(Error,'no error'))
+%                 error(Error);
+%             end
+%         end 
+
+%==================================================================
+% ReturnGridImageCidx
+%================================================================== 
+        function ReturnGridImageCidx(obj,GpuNum,ImageMatrix,ChanNum)
             if GpuNum > obj.NumGpuUsed-1
                 error('Specified ''GpuNum'' beyond number of GPUs used');
             end
             GpuNum = uint64(GpuNum);
-            func = str2func(['ReturnComplexMatrixSingleGpu',obj.CompCap]);
-            [KspaceMatrix,Error] = func(GpuNum,obj.HKspaceMatrix(1,:),obj.GridImageMatrixMemDims);
+            ChanNum = uint64(ChanNum);
+            func = str2func(['ReturnComplexMatrixSingleGpuCidx',obj.CompCap]);
+            [Error] = func(GpuNum,obj.HGridImageMatrix(1,:),ImageMatrix,ChanNum);
             if not(strcmp(Error,'no error'))
                 error(Error);
             end
         end         
         
 %==================================================================
-% ReturnBaseImage
+% ReturnBaseImage (old)
 %================================================================== 
-        function ImageMatrix = ReturnBaseImage(obj,GpuNum)
-            if GpuNum > obj.NumGpuUsed-1
-                error('Specified ''GpuNum'' beyond number of GPUs used');
-            end
-            GpuNum = uint64(GpuNum);
-            func = str2func(['ReturnComplexMatrixSingleGpu',obj.CompCap]);
-            [ImageMatrix,Error] = func(GpuNum,obj.HBaseImageMatrix(1,:),obj.BaseImageMatrixMemDims);
-            if not(strcmp(Error,'no error'))
-                error(Error);
-            end
-        end         
+%         function ImageMatrix = ReturnBaseImage(obj,GpuNum)
+%             if GpuNum > obj.NumGpuUsed-1
+%                 error('Specified ''GpuNum'' beyond number of GPUs used');
+%             end
+%             GpuNum = uint64(GpuNum);
+%             func = str2func(['ReturnComplexMatrixSingleGpu',obj.CompCap]);
+%             [ImageMatrix,Error] = func(GpuNum,obj.HBaseImageMatrix(1,:),obj.BaseImageMatrixMemDims);
+%             if not(strcmp(Error,'no error'))
+%                 error(Error);
+%             end
+%         end         
 
 %==================================================================
 % ReturnBaseImageCidx
@@ -635,20 +651,20 @@ classdef StitchItGpu < handle
         end         
         
 %==================================================================
-% ReturnSampDat
+% ReturnSampDat (old)
 %================================================================== 
-        function SampDat = ReturnSampDat(obj,GpuNum)
-            if GpuNum > obj.NumGpuUsed-1
-                error('Specified ''GpuNum'' beyond number of GPUs used');
-            end
-            GpuNum = uint64(GpuNum);
-            %func = str2func(['ReturnSampDatSingleGpuRI',obj.CompCap]);                 % old
-            func = str2func(['ReturnSampDatSingleGpu',obj.CompCap]);
-            [SampDat,Error] = func(GpuNum,obj.HSampDat(1,:),obj.SampDatMemDims);
-            if not(strcmp(Error,'no error'))
-                error(Error);
-            end
-        end         
+%         function SampDat = ReturnSampDat(obj,GpuNum)
+%             if GpuNum > obj.NumGpuUsed-1
+%                 error('Specified ''GpuNum'' beyond number of GPUs used');
+%             end
+%             GpuNum = uint64(GpuNum);
+%             %func = str2func(['ReturnSampDatSingleGpuRI',obj.CompCap]);                 % old
+%             func = str2func(['ReturnSampDatSingleGpu',obj.CompCap]);
+%             [SampDat,Error] = func(GpuNum,obj.HSampDat(1,:),obj.SampDatMemDims);
+%             if not(strcmp(Error,'no error'))
+%                 error(Error);
+%             end
+%         end         
  
 %==================================================================
 % ReturnSampDatCidx
@@ -667,9 +683,9 @@ classdef StitchItGpu < handle
         end       
         
 %==================================================================
-% ReturnFov
+% Grid2BaseImage
 %==================================================================         
-        function ReturnFov(obj,GpuNum)
+        function Grid2BaseImage(obj,GpuNum)
             if GpuNum > obj.NumGpuUsed-1
                 error('Specified ''GpuNum'' beyond number of GPUs used');
             end
@@ -683,9 +699,9 @@ classdef StitchItGpu < handle
         end            
 
 %==================================================================
-% ExpandFov
+% Base2GridImage
 %==================================================================         
-        function ExpandFov(obj,GpuNum)
+        function Base2GridImage(obj,GpuNum)
             if GpuNum > obj.NumGpuUsed-1
                 error('Specified ''GpuNum'' beyond number of GPUs used');
             end

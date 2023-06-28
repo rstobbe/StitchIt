@@ -1,21 +1,22 @@
 %================================================================
-% StitchItNufft1a
+% NufftIterate
 %   
 %================================================================
 
-classdef StitchItNufft1a < handle
+classdef NufftIterate < handle
 
     properties (SetAccess = private)                                     
-        StitchIt
-        Options
-        Log
-        AcqInfo
+        NufftFuncs
         RxChannels
+        RxProfs
+        BaseMatrix
+        GridMatrix
+        NumTraj
+        NumCol
         ChanPerGpu
         NumGpuUsed
         ReconRxBatches
         ReconRxBatchLen
-        RxProfs
         TestTime
         ImageMemPin
         DataMemPin
@@ -28,70 +29,59 @@ classdef StitchItNufft1a < handle
 %==================================================================
 % Constructor
 %==================================================================   
-        function [obj] = StitchItNufft1a(Options)
-            obj.StitchIt = StitchItFunctions();
-            obj.Options = Options;
-            obj.Log = Log('');
+        function [obj] = NufftIterate()
+            obj.NufftFuncs = NufftFunctions();
         end                        
         
 %==================================================================
-% Setup
+% Initialize
 %==================================================================   
-        function Setup(obj,AcqInfo,RxProfs)
-            obj.AcqInfo = AcqInfo;    
-            sz = size(RxProfs);
-            if length(sz) == 3
-                obj.RxChannels = 1;
-            else
-                obj.RxChannels = sz(4);
-            end
-            if obj.RxChannels == 1          
-                obj.Options.SetGpus2Use(1);
-            end
-            obj.Options.Initialize(obj.AcqInfo);
-            obj.NumGpuUsed = obj.Options.Gpus2Use;
+        function Initialize(obj,Stitch,KernHolder,AcqInfo,RxChannels,RxProfs)
+            obj.NumGpuUsed = Stitch.Gpus2Use;
+            obj.BaseMatrix = Stitch.BaseMatrix;
+            obj.GridMatrix = Stitch.GridMatrix;
+            obj.RxChannels = RxChannels;
+            obj.NumTraj = AcqInfo.NumTraj;
+            obj.NumCol = AcqInfo.NumCol;
             
             %--------------------------------------
             % Receive Batching
             %   - for limited memory GPUs (and/or many RxChannels)
             %--------------------------------------             
-            GridMemory = (obj.Options.ZeroFill^3)*20;          % k-space + image + invfilt (complex & single)
-            BaseImageMemory = (obj.Options.BaseMatrix^3)*8;
-            DataKspaceMemory = obj.AcqInfo.NumTraj*obj.AcqInfo.NumCol*16;
+            GridMemory = (obj.GridMatrix^3)*20;          % k-space + image + invfilt (complex & single)
+            BaseImageMemory = (obj.BaseMatrix^3)*8;
+            DataKspaceMemory = obj.NumTraj*obj.NumCol*16;
             TotalMemory = GridMemory + BaseImageMemory + DataKspaceMemory;
-            AvailableMemory = obj.StitchIt.GpuParams.AvailableMemory;
+            AvailableMemory = obj.NufftFuncs.GpuParams.AvailableMemory;
             for n = 1:20
                 obj.ReconRxBatches = n;
-                obj.ChanPerGpu = ceil(obj.RxChannels/(obj.Options.Gpus2Use*obj.ReconRxBatches));
+                obj.ChanPerGpu = ceil(obj.RxChannels/(obj.NumGpuUsed*obj.ReconRxBatches));
                 MemoryNeededTotal = TotalMemory + BaseImageMemory * obj.ChanPerGpu;
                 if MemoryNeededTotal*1.2 < AvailableMemory
                     break
                 end
             end
-            obj.ReconRxBatchLen = obj.ChanPerGpu * obj.Options.Gpus2Use;              
+            obj.ReconRxBatchLen = obj.ChanPerGpu * obj.NumGpuUsed;              
             
             %--------------------------------------
-            % StitchIt Initialize
+            % Nufft Initialize
             %--------------------------------------
-            obj.StitchIt.Initialize(obj.Options,obj.AcqInfo,obj.ChanPerGpu,obj.Log);
-            
+            obj.NufftFuncs.Initialize(obj,KernHolder,AcqInfo);
+
             %--------------------------------------
             % Load RxProfs
             %--------------------------------------   
             if obj.ReconRxBatches == 1
-                obj.StitchIt.LoadRcvrProfMatricesGpuMum(RxProfs);
+                obj.NufftFuncs.LoadRcvrProfMatricesGpuMum(RxProfs);
             else
                 obj.RxProfs = RxProfs;
             end 
             obj.NumRunsInverse = 0;
-            obj.NumRunsForward = 0;
+            obj.NumRunsForward = 0;               
         end      
 
 %==================================================================
 % Inverse
-%   - check if all calls Async...
-%   - some Cuda efficiency coding to be done still
-%   - weight kern properly - take out scaling...
 %================================================================== 
         function Image = Inverse(obj,Data)
 %             tic
@@ -100,7 +90,7 @@ classdef StitchItNufft1a < handle
                 error(Error);
             end
             if obj.NumRunsInverse == 0 
-                obj.ImageMemPin = complex(zeros([obj.Options.BaseMatrix obj.Options.BaseMatrix obj.Options.BaseMatrix,obj.ReconRxBatches*obj.NumGpuUsed],'single'),0);
+                obj.ImageMemPin = complex(zeros([obj.BaseMatrix obj.BaseMatrix obj.BaseMatrix,obj.ReconRxBatches*obj.NumGpuUsed],'single'),0);
                 Error = RegisterHostComplexMemCuda61(obj.ImageMemPin);
                 if not(strcmp(Error,'no error'))
                     error(Error);
@@ -115,12 +105,12 @@ classdef StitchItNufft1a < handle
                 end
                 Rcvrs = RbStart:RbStop;
                 if obj.ReconRxBatches ~= 1
-                    obj.StitchIt.LoadRcvrProfMatricesGpuMum(obj.RxProfs(:,:,:,Rcvrs));
+                    obj.NufftFuncs.LoadRcvrProfMatricesGpuMum(obj.RxProfs(:,:,:,Rcvrs));
                 end
-                obj.StitchIt.InitializeBaseMatricesGpuMem;
+                obj.NufftFuncs.InitializeBaseMatricesGpuMem;
                 for p = 1:obj.ChanPerGpu
 %---
-%                     obj.StitchIt.CudaDeviceWait(1);
+%                     obj.NufftFuncs.CudaDeviceWait(1);
 %                     tic
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -128,19 +118,19 @@ classdef StitchItNufft1a < handle
                         if ChanNum > obj.RxChannels
                             break
                         end
-                        obj.StitchIt.LoadSampDatGpuMemAsyncCidx(GpuNum,Data,ChanNum);
+                        obj.NufftFuncs.LoadSampDatGpuMemAsyncCidx(GpuNum,Data,ChanNum);
                     end 
-%                     obj.StitchIt.CudaDeviceWait(1);
+%                     obj.NufftFuncs.CudaDeviceWait(1);
 %                     toc
 %---
-                    obj.StitchIt.InitializeGridMatricesGpuMem;
+                    obj.NufftFuncs.InitializeGridMatricesGpuMem;
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
                         ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end    
-                        obj.StitchIt.GridSampDat(GpuNum);
+                        obj.NufftFuncs.GridSampDat(GpuNum);
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -148,7 +138,7 @@ classdef StitchItNufft1a < handle
                         if ChanNum > obj.RxChannels
                             break
                         end  
-                        obj.StitchIt.KspaceFourierTransformShift(GpuNum); 
+                        obj.NufftFuncs.KspaceFourierTransformShift(GpuNum); 
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -156,7 +146,7 @@ classdef StitchItNufft1a < handle
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        obj.StitchIt.InverseFourierTransform(GpuNum);
+                        obj.NufftFuncs.InverseFourierTransform(GpuNum);
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -164,7 +154,7 @@ classdef StitchItNufft1a < handle
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        obj.StitchIt.ImageFourierTransformShift(GpuNum); 
+                        obj.NufftFuncs.ImageFourierTransformShift(GpuNum); 
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -172,7 +162,7 @@ classdef StitchItNufft1a < handle
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        obj.StitchIt.MultInvFilt(GpuNum);
+                        obj.NufftFuncs.MultInvFilt(GpuNum);
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -180,31 +170,31 @@ classdef StitchItNufft1a < handle
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        obj.StitchIt.AccumulateImage(GpuNum,p);
+                        obj.NufftFuncs.AccumulateImage(GpuNum,p);
                     end
                 end
                 for m = 1:obj.NumGpuUsed
                     GpuNum = m-1;
-                    obj.StitchIt.CudaDeviceWait(GpuNum);
+                    obj.NufftFuncs.CudaDeviceWait(GpuNum);
                 end
 %---
-%                 obj.StitchIt.CudaDeviceWait(1);
+%                 obj.NufftFuncs.CudaDeviceWait(1);
 %                 tic
                 for m = 1:obj.NumGpuUsed
                     GpuNum = m-1;
                     ReturnNum = (q-1)*obj.ReconRxBatches + m;
-                    obj.StitchIt.ReturnBaseImageCidx(GpuNum,obj.ImageMemPin,ReturnNum);
+                    obj.NufftFuncs.ReturnBaseImageCidx(GpuNum,obj.ImageMemPin,ReturnNum);
                 end
-%                 obj.StitchIt.CudaDeviceWait(1);
+%                 obj.NufftFuncs.CudaDeviceWait(1);
 %                 toc
 %---
             end
             for m = 1:obj.NumGpuUsed
                 GpuNum = m-1;
-                obj.StitchIt.CudaDeviceWait(GpuNum);
+                obj.NufftFuncs.CudaDeviceWait(GpuNum);
             end
             Image = sum(obj.ImageMemPin,4);
-            Scale = 1/obj.StitchIt.ConvScaleVal * single(obj.StitchIt.BaseImageMatrixMemDims(1)).^1.5 / single(obj.StitchIt.GridImageMatrixMemDims(1))^3;
+            Scale = 1/obj.NufftFuncs.ConvScaleVal * single(obj.NufftFuncs.BaseImageMatrixMemDims(1)).^1.5 / single(obj.NufftFuncs.GridImageMatrixMemDims(1))^3;
             Image = Image*Scale;
             Error = UnRegisterHostMemCuda61(Data);
             if not(strcmp(Error,'no error'))
@@ -214,8 +204,6 @@ classdef StitchItNufft1a < handle
 
 %==================================================================
 % Forward
-%   - check if all calls Async...
-%   - some Cuda efficiency coding to be done still
 %==================================================================         
         function Data = Forward(obj,Image)
 %             tic
@@ -224,7 +212,7 @@ classdef StitchItNufft1a < handle
                 error(Error);
             end
             if obj.NumRunsForward == 0 
-                obj.DataMemPin = complex(zeros([obj.AcqInfo.NumCol,obj.AcqInfo.NumTraj,obj.RxChannels],'single'),0);
+                obj.DataMemPin = complex(zeros([obj.NumCol,obj.NumTraj,obj.RxChannels],'single'),0);
                 Error = RegisterHostComplexMemCuda61(obj.DataMemPin);
                 if not(strcmp(Error,'no error'))
                     error(Error);
@@ -232,10 +220,10 @@ classdef StitchItNufft1a < handle
             end
             obj.NumRunsForward = obj.NumRunsForward+1;
 %---
-%             obj.StitchIt.CudaDeviceWait(1);
+%             obj.NufftFuncs.CudaDeviceWait(1);
 %             tic
-            obj.StitchIt.LoadImageMatrixGpuMem(Image);
-%             obj.StitchIt.CudaDeviceWait(1);
+            obj.NufftFuncs.LoadImageMatrixGpuMem(Image);
+%             obj.NufftFuncs.CudaDeviceWait(1);
 %             toc
 %---
             for q = 1:obj.ReconRxBatches 
@@ -246,17 +234,17 @@ classdef StitchItNufft1a < handle
                 end
                 Rcvrs = RbStart:RbStop;
                 if obj.ReconRxBatches ~= 1
-                    obj.StitchIt.LoadRcvrProfMatricesGpuMum(obj.RxProfs(:,:,:,Rcvrs));
+                    obj.NufftFuncs.LoadRcvrProfMatricesGpuMum(obj.RxProfs(:,:,:,Rcvrs));
                 end
                 for p = 1:obj.ChanPerGpu 
-                    obj.StitchIt.InitializeGridMatricesGpuMem;
+                    obj.NufftFuncs.InitializeGridMatricesGpuMem;
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
                         ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        obj.StitchIt.RcvrWgtExpandImage(GpuNum,p);
+                        obj.NufftFuncs.RcvrWgtExpandImage(GpuNum,p);
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -264,7 +252,7 @@ classdef StitchItNufft1a < handle
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        obj.StitchIt.MultInvFilt(GpuNum);
+                        obj.NufftFuncs.MultInvFilt(GpuNum);
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -272,7 +260,7 @@ classdef StitchItNufft1a < handle
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        obj.StitchIt.ImageFourierTransformShift(GpuNum); 
+                        obj.NufftFuncs.ImageFourierTransformShift(GpuNum); 
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -280,7 +268,7 @@ classdef StitchItNufft1a < handle
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        obj.StitchIt.FourierTransform(GpuNum);
+                        obj.NufftFuncs.FourierTransform(GpuNum);
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -288,7 +276,7 @@ classdef StitchItNufft1a < handle
                         if ChanNum > obj.RxChannels
                             break
                         end  
-                        obj.StitchIt.KspaceFourierTransformShift(GpuNum); 
+                        obj.NufftFuncs.KspaceFourierTransformShift(GpuNum); 
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -296,14 +284,14 @@ classdef StitchItNufft1a < handle
                         if ChanNum > obj.RxChannels
                             break
                         end    
-                        obj.StitchIt.ReverseGrid(GpuNum);
+                        obj.NufftFuncs.ReverseGrid(GpuNum);
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
-                        obj.StitchIt.CudaDeviceWait(GpuNum);
+                        obj.NufftFuncs.CudaDeviceWait(GpuNum);
                     end
 %---
-%                     obj.StitchIt.CudaDeviceWait(1);
+%                     obj.NufftFuncs.CudaDeviceWait(1);
 %                     tic 
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
@@ -311,24 +299,24 @@ classdef StitchItNufft1a < handle
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        obj.StitchIt.ReturnSampDatCidx(GpuNum,obj.DataMemPin,ChanNum);
+                        obj.NufftFuncs.ReturnSampDatCidx(GpuNum,obj.DataMemPin,ChanNum);
                     end
-%                     obj.StitchIt.CudaDeviceWait(1);
+%                     obj.NufftFuncs.CudaDeviceWait(1);
 %                     toc
 %---
                 end
             end
             for m = 1:obj.NumGpuUsed
                 GpuNum = m-1;
-                obj.StitchIt.CudaDeviceWait(GpuNum);
+                obj.NufftFuncs.CudaDeviceWait(GpuNum);
             end
-            Scale = single(1/(obj.StitchIt.ConvScaleVal * obj.StitchIt.SubSamp.^3 * double(obj.StitchIt.BaseImageMatrixMemDims(1)).^1.5));
+            Scale = single(1/(obj.NufftFuncs.ConvScaleVal * obj.NufftFuncs.SubSamp.^3 * double(obj.NufftFuncs.BaseImageMatrixMemDims(1)).^1.5));
             Data = obj.DataMemPin*Scale;
             Error = UnRegisterHostMemCuda61(Image);
             if not(strcmp(Error,'no error'))
                 error(Error);
             end 
-%             obj.StitchIt.CudaDeviceWait(1);
+%             obj.NufftFuncs.CudaDeviceWait(1);
 %             obj.TestTime = [obj.TestTime toc];
 %             TestTotalTime = sum(obj.TestTime)
         end
@@ -349,7 +337,7 @@ classdef StitchItNufft1a < handle
                     error(Error);
                 end
             end
-            obj.StitchIt.FreeGpuMem;
+            obj.NufftFuncs.FreeGpuMem;
         end        
         
     end

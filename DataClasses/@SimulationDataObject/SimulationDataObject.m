@@ -68,14 +68,14 @@ classdef SimulationDataObject < handle
             obj.DataInfo.TrajName = '';
             obj.DataInfo.TrajImpName = '';
             obj.DataInfo.RxChannels = 1;
-            obj.DataInfo.SimSampZeroFill = SAMP.ZF;
+            obj.DataInfo.SimSampGridMatrix = SAMP.ZF;
         end
         
 %==================================================================
 % Initialize
 %==================================================================   
         function Initialize(obj,Options)
-            Scale = (Options.ZeroFill/obj.DataInfo.SimSampZeroFill)^3;
+            Scale = (Options.GridMatrix/obj.DataInfo.SimSampGridMatrix)^3;
             for n = 1:length(obj.DataFull)
                 obj.DataFull{n} = obj.DataFull{n}*Scale;
             end
@@ -85,16 +85,11 @@ classdef SimulationDataObject < handle
         end
 
 %==================================================================
-% InitializeForStitchIt
+% ScaleSimulationData
 %==================================================================   
-        function InitializeForStitchIt(obj,Options)
-            Scale = ((Options.ZeroFill/obj.DataInfo.SimSampZeroFill)^3)/Options.BaseMatrix^1.5;
-            for n = 1:length(obj.DataFull)
-                obj.DataFull{n} = obj.DataFull{n}*Scale;
-            end
-            if isprop(Options,'IntensityScale')
-                Options.SetIntensityScale(1);
-            end
+        function Data = ScaleSimulationData(obj,StitchIt,Data)
+            Scale = ((StitchIt.GridMatrix/obj.DataInfo.SimSampGridMatrix)^3)/StitchIt.BaseMatrix^1.5;
+            Data = Data*Scale;
         end        
         
 %==================================================================

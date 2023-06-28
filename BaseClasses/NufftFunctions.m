@@ -2,7 +2,7 @@
 %  
 %================================================================
 
-classdef StitchItFunctions < StitchItGpu
+classdef NufftFunctions < NufftGpu
 
     properties (SetAccess = private)
     end
@@ -11,50 +11,48 @@ classdef StitchItFunctions < StitchItGpu
 %==================================================================
 % Constructor
 %==================================================================   
-        function [obj] = StitchItFunctions()
-            obj@StitchItGpu;
+        function [obj] = NufftFunctions()
+            obj@NufftGpu;
         end     
 
 %==================================================================
 % Initialize
 %==================================================================   
-        function Initialize(obj,Options,AcqInfo,ChanPerGpu,log)
+        function Initialize(obj,Nufft,KernHolder,AcqInfo)
 
             %--------------------------------------
             % Gpu
             %--------------------------------------            
             obj.FreeGpuMem;
-            obj.GpuInit(Options.Gpus2Use);
-            obj.SetChanPerGpu(ChanPerGpu);
+            obj.GpuInit(Nufft.NumGpuUsed);
+            obj.SetChanPerGpu(Nufft.ChanPerGpu);
             
             %--------------------------------------
             % Gridding Initialize
             %-------------------------------------- 
-            log.trace('Gridding Initialize');
-            iKern = round(1e9*(1/(Options.Kernel.res*Options.Kernel.DesforSS)))/1e9;
-            Kern = Options.Kernel.Kern;
-            KernHalfWid = ceil(((Options.Kernel.W*Options.Kernel.DesforSS)-2)/2);
-            SubSamp = Options.Kernel.DesforSS;
+            iKern = round(1e9*(1/(KernHolder.Kernel.res*KernHolder.Kernel.DesforSS)))/1e9;
+            Kern = KernHolder.Kernel.Kern;
+            KernHalfWid = ceil(((KernHolder.Kernel.W*KernHolder.Kernel.DesforSS)-2)/2);
+            SubSamp = KernHolder.Kernel.DesforSS;
             if (KernHalfWid+1)*iKern > length(Kern)
                 error('Gridding Kernel Issue');
             end
             kStep = AcqInfo.kStep;
             kMatCentre = ceil(SubSamp*AcqInfo.kMaxRad/AcqInfo.kStep) + (KernHalfWid + 2); 
             kSz = kMatCentre*2 - 1;
-            if kSz > Options.ZeroFill
+            if kSz > Nufft.GridMatrix
                 error(['Zero-Fill is to small. kSz = ',num2str(kSz)]);
             end 
-            kShift = (Options.ZeroFill/2+1)-((kSz+1)/2);
-            ConvScaleVal = Options.Kernel.convscaleval;
+            kShift = (Nufft.GridMatrix/2+1)-((kSz+1)/2);
+            ConvScaleVal = KernHolder.Kernel.convscaleval;
             ReconInfoMat(:,:,1:3) = SubSamp*(AcqInfo.ReconInfoMat(:,:,1:3)/kStep) + kMatCentre + kShift;     
             ReconInfoMat(:,:,4) = AcqInfo.ReconInfoMat(:,:,4);
             
             %--------------------------------------
             % Allocate GPU Memory
             %--------------------------------------
-            log.trace('Allocate GPU Memory');
-            obj.AllocateKspaceGridImageMatricesGpuMem([Options.ZeroFill Options.ZeroFill Options.ZeroFill]); 
-            obj.AllocateBaseImageMatricesGpuMem([Options.BaseMatrix Options.BaseMatrix Options.BaseMatrix]); 
+            obj.AllocateKspaceGridImageMatricesGpuMem([Nufft.GridMatrix Nufft.GridMatrix Nufft.GridMatrix]); 
+            obj.AllocateBaseImageMatricesGpuMem([Nufft.BaseMatrix Nufft.BaseMatrix Nufft.BaseMatrix]); 
             obj.AllocateRcvrProfMatricesGpuMem;        
             ReconInfoSize = [AcqInfo.NumCol AcqInfo.NumTraj 4];                 % Includes SDC
             obj.AllocateReconInfoGpuMem(ReconInfoSize);                       
@@ -66,7 +64,7 @@ classdef StitchItFunctions < StitchItGpu
             %-------------------------------------- 
             obj.LoadKernelGpuMem(Kern,iKern,KernHalfWid,ConvScaleVal,SubSamp);  
             obj.LoadReconInfoGpuMemAsync(ReconInfoMat);
-            obj.LoadInvFiltGpuMem(Options.InvFilt.V); 
+            obj.LoadInvFiltGpuMem(KernHolder.InvFilt.V); 
 
             %--------------------------------------
             % FftInitialize

@@ -21,6 +21,7 @@ properties (SetAccess = private)
     kMaxRad
     ReconInfoMat
     DataOrder
+    Reordered = 0
 end
 
 methods 
@@ -79,6 +80,10 @@ end
 function SetDataOrder(STCH,DataOrder)     
     STCH.DataOrder = DataOrder;
 end
+function SetReordered(STCH)     
+    STCH.Reordered = 1;
+end
+
 
 
 end
