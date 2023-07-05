@@ -51,7 +51,7 @@ for n = 1:length(DataPos)
     MdhTemp = MdhTemp([1:20 41:end],:);     
     Mdh = EvalMdh(MdhTemp);
     test = sum(Mdh.sLC);
-    if test == 0
+    if test == 0 || test == 1
         GoodSeq = [GoodSeq n];
     end
 end
