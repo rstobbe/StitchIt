@@ -14,7 +14,6 @@ classdef SimulationDataObject < handle
         NumAverages
         TotalAcqs
         DataFull
-        DataBlock
         FovShift = [0 0 0]
     end
     methods 
@@ -85,26 +84,20 @@ classdef SimulationDataObject < handle
         end
 
 %==================================================================
-% ScaleSimulationData
+% ScaleData
 %==================================================================   
-        function Data = ScaleSimulationData(obj,StitchIt,Data)
+        function Data = ScaleData(obj,StitchIt,Data)
             Scale = ((StitchIt.GridMatrix/obj.DataInfo.SimSampGridMatrix)^3)/StitchIt.BaseMatrix^1.5;
             Data = Data*Scale;
         end        
         
 %==================================================================
-% ReturnData
+% ReturnAllData
 %================================================================== 
-        function Data = ReturnData(obj,Log)  
-            Data = obj.DataFull;
+        function Data = ReturnAllData(obj,AcqInfo)  
+            Data = obj.DataFull{1};
         end        
         
-%==================================================================
-% ReadDataBlock
-%================================================================== 
-        function ReadDataBlock(obj,Trajs,Rcvrs,AveNum,AcqNum,AcqInfo,Log)        
-            obj.DataBlock = obj.DataFull{AcqNum}(:,Trajs,Rcvrs,AveNum);
-        end
             
     end
 end
