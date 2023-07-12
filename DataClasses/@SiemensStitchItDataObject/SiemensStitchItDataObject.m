@@ -66,6 +66,14 @@ classdef SiemensStitchItDataObject < handle
             AllData = BuildComplexDataArray([obj.DataPath,obj.DataFile],QDataMemPosArr,QDataInfo);
             AllData = AllData * 1000;
         end        
+
+%==================================================================
+% ScaleData
+%==================================================================   
+        function Data = ScaleData(obj,StitchIt,Data)
+            Scale = 1;
+            Data = Data*Scale;
+        end             
         
 %==================================================================
 % SetDataDims (For Hacking)
