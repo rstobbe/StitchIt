@@ -6,7 +6,7 @@ classdef NufftGpu < handle
         HReconInfo; ReconInfoMemDims;
         HKernel; iKern; KernHw; KernelMemDims; ConvScaleVal; SubSamp;
         HKspaceMatrix; HGridImageMatrix; HTempMatrix; GridImageMatrixMemDims;
-        HBaseImageMatrix; BaseImageMatrixMemDims; 
+        HBaseImageMatrix; BaseImageMatrixMemDims; TempImageMatrixMemDims;
         HRcvrProfMatrix;
         HFourierTransformPlan;
         HInvFilt;  
@@ -46,7 +46,6 @@ classdef NufftGpu < handle
             obj.GridImageMatrixMemDims = uint64(GridImageMatrixMemDims);
             obj.HKspaceMatrix = zeros([1,obj.NumGpuUsed],'uint64');
             obj.HGridImageMatrix = zeros([1,obj.NumGpuUsed],'uint64');
-            obj.HTempMatrix = zeros([1,obj.NumGpuUsed],'uint64');
             func = str2func(['AllocateInitializeComplexMatrixAllGpuMem',obj.CompCap]);
             [obj.HKspaceMatrix(1,:),Error] = func(obj.NumGpuUsed,obj.GridImageMatrixMemDims);
             if not(strcmp(Error,'no error'))
@@ -56,17 +55,35 @@ classdef NufftGpu < handle
             if not(strcmp(Error,'no error'))
                 error(Error);
             end
-            [obj.HTempMatrix(1,:),Error] = func(obj.NumGpuUsed,obj.GridImageMatrixMemDims);
+        end          
+
+%==================================================================
+% AllocateTempMatrixGpuMem
+%==================================================================                      
+        function AllocateTempMatrixGpuMem(obj,TempMatrixMemDims)
+            if isempty(TempMatrixMemDims)
+                return
+            end
+            if size(TempMatrixMemDims) ~= 3
+                error('Specify 3D ');
+            end
+            obj.TempImageMatrixMemDims = uint64(TempMatrixMemDims);
+            obj.HTempMatrix = zeros([1,obj.NumGpuUsed],'uint64');
+            func = str2func(['AllocateInitializeComplexMatrixAllGpuMem',obj.CompCap]);
+            [obj.HTempMatrix(1,:),Error] = func(obj.NumGpuUsed,obj.TempImageMatrixMemDims);
             if not(strcmp(Error,'no error'))
                 error(Error);
             end
-        end          
+        end         
         
 %==================================================================
 % AllocateBaseImageMatricesGpuMem
 %==================================================================                      
         function AllocateBaseImageMatricesGpuMem(obj,BaseImageMatrixMemDims)
-             if size(BaseImageMatrixMemDims) ~= 3
+            if isempty(BaseImageMatrixMemDims)
+                return
+            end
+            if size(BaseImageMatrixMemDims) ~= 3
                 error('Specify 3D ');
             end
             obj.BaseImageMatrixMemDims = uint64(BaseImageMatrixMemDims);
@@ -98,11 +115,11 @@ classdef NufftGpu < handle
                        
 %==================================================================
 % AllocateReconInfoGpuMem
-%   - ReconInfoMemDims: array of 3 (read x proj x 4 [x,y,z,sdc])
+%   - ReconInfoMemDims: array of 3 (4 x proj x read [x,y,z,sdc])
 %   - function allocates ReconInfo space on all GPUs
 %================================================================== 
         function AllocateReconInfoGpuMem(obj,ReconInfoMemDims)    
-            if ReconInfoMemDims(3) ~= 4
+            if ReconInfoMemDims(1) ~= 4
                 error('ReconInfo dimensionality problem');  
             end
             obj.ReconInfoMemDims = uint64(ReconInfoMemDims);
@@ -115,7 +132,7 @@ classdef NufftGpu < handle
         
 %==================================================================
 % AllocateSampDatGpuMem
-%   - SampDatMemDims: array of 2 (read x proj)
+%   - SampDatMemDims: array of 2 (proj x read)
 %   - function allocates SampDat space on all GPUs
 %================================================================== 
         function AllocateSampDatGpuMem(obj,SampDatMemDims)    
@@ -123,7 +140,7 @@ classdef NufftGpu < handle
                 if isempty(obj.ReconInfoMemDims)
                     error('AllocateReconInfoGpuMem first');
                 end
-                if SampDatMemDims(n) ~= obj.ReconInfoMemDims(n)
+                if SampDatMemDims(n) ~= obj.ReconInfoMemDims(n+1)
                     error('SampDat dimensionality problem');  
                 end
             end
@@ -200,8 +217,6 @@ classdef NufftGpu < handle
             if ~isa(InvFilt,'single')
                 error('InvFilt must be in single format');
             end 
-            sz = size(InvFilt);
-            obj.GridImageMatrixMemDims = uint64(sz);
             func = str2func(['AllocateLoadRealMatrixAllGpuMem',obj.CompCap]);
             [obj.HInvFilt,Error] = func(obj.NumGpuUsed,InvFilt);
             if not(strcmp(Error,'no error'))
@@ -235,7 +250,7 @@ classdef NufftGpu < handle
 %==================================================================
 % LoadReconInfoGpuMemAsync
 %   - kMat -> already normalized
-%   - ReconInfo: read x proj x 4 [x,y,z,sdc]
+%   - ReconInfo: 4 x proj x read [x,y,z,sdc]
 %   - function loads ReconInfo on all GPUs
 %================================================================== 
         function LoadReconInfoGpuMemAsync(obj,ReconInfo)
@@ -256,30 +271,8 @@ classdef NufftGpu < handle
         end            
 
 %==================================================================
-% LoadSampDatGpuMemAsync
-%   - SampDat: read x proj
-%   - function loads SampDat on one GPU asynchronously
-%   - Use Below
-%================================================================== 
-%         function LoadSampDatGpuMemAsync(obj,LoadGpuNum,SampDat)
-%             if LoadGpuNum > obj.NumGpuUsed-1
-%                 error('Specified ''LoadGpuNum'' beyond number of GPUs used');
-%             end
-%             LoadGpuNum = uint64(LoadGpuNum);
-%             if ~isa(SampDat,'single')
-%                 error('SampDat must be in single format');
-%             end
-%             func = str2func(['LoadSampDatGpuMemAsync',obj.CompCap]);
-%             %func = str2func(['LoadSampDatGpuMemAsyncRI',obj.CompCap]);             % old
-%             [Error] = func(LoadGpuNum,obj.HSampDat(1,:),SampDat);
-%             if not(strcmp(Error,'no error'))
-%                 error(Error);
-%             end
-%         end   
-
-%==================================================================
 % LoadSampDatGpuMemAsyncCidx
-%   - SampDat: read x proj
+%   - SampDat: proj x read
 %   - function loads SampDat on one GPU asynchronously
 %   - Index in C
 %================================================================== 
@@ -395,8 +388,7 @@ classdef NufftGpu < handle
                 error('Specified ''GpuNum'' beyond number of GPUs used');
             end
             GpuNum = uint64(GpuNum);
-            %func = str2func(['GridSampDat',obj.CompCap]);
-            func = str2func(['GridSampDat256',obj.CompCap]);
+            func = str2func(['GridSampDat',obj.CompCap]);
             [Error] = func(GpuNum,obj.HSampDat(1,:),obj.HReconInfo,obj.HKernel,obj.HKspaceMatrix(1,:),...
                                     obj.SampDatMemDims,obj.KernelMemDims,obj.GridImageMatrixMemDims,obj.iKern,obj.KernHw);
             if not(strcmp(Error,'no error'))
@@ -429,7 +421,7 @@ classdef NufftGpu < handle
             end
             GpuNum = uint64(GpuNum);
             func = str2func(['FourierTransformShiftSingleGpu',obj.CompCap]);
-            [Error] = func(GpuNum,obj.HKspaceMatrix(1,:),obj.HTempMatrix,obj.GridImageMatrixMemDims);  
+            [Error] = func(GpuNum,obj.HKspaceMatrix(1,:),obj.HGridImageMatrix,obj.GridImageMatrixMemDims);  
             if not(strcmp(Error,'no error'))
                 error(Error);
             end
@@ -449,7 +441,55 @@ classdef NufftGpu < handle
                 error(Error);
             end
         end  
- 
+
+%==================================================================
+% ImageFourierTransformShiftReduce
+%==================================================================         
+        function ImageFourierTransformShiftReduce(obj,GpuNum)
+            if GpuNum > obj.NumGpuUsed-1
+                error('Specified ''GpuNum'' beyond number of GPUs used');
+            end
+            Inset = uint64((obj.GridImageMatrixMemDims(1) - obj.BaseImageMatrixMemDims(1))/2);            
+            GpuNum = uint64(GpuNum);
+            func = str2func(['FourierTransformShiftReduceSingleGpu',obj.CompCap]);
+            [Error] = func(GpuNum,obj.HGridImageMatrix(1,:),obj.HBaseImageMatrix(1,:),obj.GridImageMatrixMemDims,obj.BaseImageMatrixMemDims,Inset);  
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end          
+
+%==================================================================
+% ImageFourierTransformShiftReduceToTemp
+%==================================================================         
+        function ImageFourierTransformShiftReduceToTemp(obj,GpuNum)
+            if GpuNum > obj.NumGpuUsed-1
+                error('Specified ''GpuNum'' beyond number of GPUs used');
+            end
+            Inset = uint64((obj.GridImageMatrixMemDims(1) - obj.BaseImageMatrixMemDims(1))/2);            
+            GpuNum = uint64(GpuNum);
+            func = str2func(['FourierTransformShiftReduceSingleGpu',obj.CompCap]);
+            [Error] = func(GpuNum,obj.HGridImageMatrix(1,:),obj.HTempMatrix(1,:),obj.GridImageMatrixMemDims,obj.BaseImageMatrixMemDims,Inset);  
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end         
+
+%==================================================================
+% ImageFourierTransformShiftExpandFromTemp
+%==================================================================         
+        function ImageFourierTransformShiftExpandFromTemp(obj,GpuNum)
+            if GpuNum > obj.NumGpuUsed-1
+                error('Specified ''GpuNum'' beyond number of GPUs used');
+            end
+            Inset = uint64((obj.GridImageMatrixMemDims(1) - obj.BaseImageMatrixMemDims(1))/2);            
+            GpuNum = uint64(GpuNum);
+            func = str2func(['FourierTransformShiftExpandSingleGpu',obj.CompCap]);
+            [Error] = func(GpuNum,obj.HGridImageMatrix(1,:),obj.HTempMatrix(1,:),obj.GridImageMatrixMemDims,obj.BaseImageMatrixMemDims,Inset);  
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end        
+        
 %==================================================================
 % InverseFourierTransform
 %==================================================================         
@@ -496,6 +536,36 @@ classdef NufftGpu < handle
             end
         end              
 
+%==================================================================
+% MultInvFiltBase
+%==================================================================         
+        function MultInvFiltBase(obj,GpuNum)
+            if GpuNum > obj.NumGpuUsed-1
+                error('Specified ''GpuNum'' beyond number of GPUs used');
+            end
+            GpuNum = uint64(GpuNum);
+            func = str2func(['DivideComplexMatrixRealMatrixSingleGpu',obj.CompCap]);
+            [Error] = func(GpuNum,obj.HBaseImageMatrix(1,:),obj.HInvFilt,obj.BaseImageMatrixMemDims);  
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end         
+
+%==================================================================
+% MultInvFiltBaseTemp
+%==================================================================         
+        function MultInvFiltBaseTemp(obj,GpuNum)
+            if GpuNum > obj.NumGpuUsed-1
+                error('Specified ''GpuNum'' beyond number of GPUs used');
+            end
+            GpuNum = uint64(GpuNum);
+            func = str2func(['DivideComplexMatrixRealMatrixSingleGpu',obj.CompCap]);
+            [Error] = func(GpuNum,obj.HTempMatrix(1,:),obj.HInvFilt,obj.BaseImageMatrixMemDims);  
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end         
+        
 %==================================================================
 % InverseKspaceScaleCorrect
 %   **  Do not use. Excessively slow
@@ -551,6 +621,24 @@ classdef NufftGpu < handle
         end          
 
 %==================================================================
+% AccumBaseImagesWithRcvrs
+%==================================================================         
+        function AccumBaseImagesWithRcvrs(obj,GpuNum,GpuChanNum)
+            if GpuNum > obj.NumGpuUsed-1
+                error('Specified ''GpuNum'' beyond number of GPUs used');
+            end
+            if GpuChanNum > obj.ChanPerGpu
+                error('Specified ''GpuChanNum'' beyond number of GPU channels used');
+            end
+            GpuNum = uint64(GpuNum);
+            func = str2func(['AccumBaseImagesWithRcvrsSingleGpu',obj.CompCap]);
+            [Error] = func(GpuNum,obj.HBaseImageMatrix(1,:),obj.HRcvrProfMatrix(GpuChanNum,:),obj.HTempMatrix(1,:),obj.BaseImageMatrixMemDims);  
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end         
+        
+%==================================================================
 % RcvrWgtExpandImage
 %==================================================================         
         function RcvrWgtExpandImage(obj,GpuNum,GpuChanNum)
@@ -569,6 +657,24 @@ classdef NufftGpu < handle
                 error(Error);
             end
         end        
+        
+%==================================================================
+% RcvrWgtBaseImage
+%==================================================================         
+        function RcvrWgtBaseImage(obj,GpuNum,GpuChanNum)
+            if GpuNum > obj.NumGpuUsed-1
+                error('Specified ''GpuNum'' beyond number of GPUs used');
+            end
+            if GpuChanNum > obj.ChanPerGpu
+                error('Specified ''GpuChanNum'' beyond number of GPU channels used');
+            end
+            GpuNum = uint64(GpuNum);
+            func = str2func(['RcvrWgtBaseImageSingleGpu',obj.CompCap]);
+            [Error] = func(GpuNum,obj.HTempMatrix(1,:),obj.HRcvrProfMatrix(GpuChanNum,:),obj.HBaseImageMatrix(1,:),obj.BaseImageMatrixMemDims);  
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end  
         
         
 %% Utilities           
@@ -622,17 +728,17 @@ classdef NufftGpu < handle
 %==================================================================
 % ReturnBaseImage (old)
 %================================================================== 
-%         function ImageMatrix = ReturnBaseImage(obj,GpuNum)
-%             if GpuNum > obj.NumGpuUsed-1
-%                 error('Specified ''GpuNum'' beyond number of GPUs used');
-%             end
-%             GpuNum = uint64(GpuNum);
-%             func = str2func(['ReturnComplexMatrixSingleGpu',obj.CompCap]);
-%             [ImageMatrix,Error] = func(GpuNum,obj.HBaseImageMatrix(1,:),obj.BaseImageMatrixMemDims);
-%             if not(strcmp(Error,'no error'))
-%                 error(Error);
-%             end
-%         end         
+        function ImageMatrix = ReturnBaseImage(obj,GpuNum)
+            if GpuNum > obj.NumGpuUsed-1
+                error('Specified ''GpuNum'' beyond number of GPUs used');
+            end
+            GpuNum = uint64(GpuNum);
+            func = str2func(['ReturnComplexMatrixSingleGpu',obj.CompCap]);
+            [ImageMatrix,Error] = func(GpuNum,obj.HBaseImageMatrix(1,:),obj.BaseImageMatrixMemDims);
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end         
 
 %==================================================================
 % ReturnBaseImageCidx
@@ -713,7 +819,39 @@ classdef NufftGpu < handle
                 error(Error);
             end
         end   
+
+%==================================================================
+% RegisterHostMemCuda
+%==================================================================         
+        function RegisterHostMemCuda(obj,Mem)
+            func = str2func(['RegisterHostMemCuda',obj.CompCap]);
+            [Error] = func(Mem);  
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end           
         
+%==================================================================
+% RegisterHostComplexMemCuda
+%==================================================================         
+        function RegisterHostComplexMemCuda(obj,Mem)
+            func = str2func(['RegisterHostComplexMemCuda',obj.CompCap]);
+            [Error] = func(Mem);  
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end          
+
+%==================================================================
+% UnRegisterHostMemCuda
+%==================================================================         
+        function UnRegisterHostMemCuda(obj,Mem)
+            func = str2func(['UnRegisterHostMemCuda',obj.CompCap]);
+            [Error] = func(Mem);  
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end        
         
 %% TakeDown       
            

@@ -7,7 +7,7 @@
 #include "matrix.h"
 #include "math.h"
 #include "string.h"
-#include "CUDA_ConvGrid2SampComplex_v11a.h"
+#include "CUDA_ConvGrid2SampComplex_v11b.h"
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, mxArray *prhs[])
 {

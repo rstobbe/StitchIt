@@ -69,7 +69,11 @@ end
                 error(['Specified GridMatrix is too small. Min: ',num2str(round(SubSampMatrix))]);
             end
             if isempty(obj.InvFiltFile)
-                obj.InvFiltFile = [obj.KernelFile,'zf',num2str(StitchIt.GridMatrix),'S'];
+                if StitchIt.TestFov2ReturnGridMatrix
+                    obj.InvFiltFile = [obj.KernelFile,'zf',num2str(StitchIt.GridMatrix),'S'];
+                else
+                    obj.InvFiltFile = [obj.KernelFile,'zf',num2str(StitchIt.GridMatrix),'SB'];
+                end
                 load([StitchIt.StitchSupportingPath,'InverseFilters',filesep,'IF_',obj.InvFiltFile,'.mat']);              
                 obj.InvFilt = saveData.IFprms;
             end

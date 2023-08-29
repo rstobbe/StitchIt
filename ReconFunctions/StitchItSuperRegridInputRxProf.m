@@ -15,6 +15,7 @@ classdef StitchItSuperRegridInputRxProf < handle
         RxChannels
         Fov2Return = 'BaseMatrix'
         BeneficiallyOrderDataForGpu = 1
+        DataDims
     end
     
     methods 
@@ -36,10 +37,22 @@ classdef StitchItSuperRegridInputRxProf < handle
             obj.RxChannels = RxChannels;
             GpuTot = gpuDeviceCount;
             if isempty(obj.Gpus2Use)
-                obj.Gpus2Use = GpuTot;
+                if obj.RxChannels == 1
+                    obj.Gpus2Use = 1;
+                else
+                    obj.Gpus2Use = GpuTot;
+                end
             end
             if obj.Gpus2Use > GpuTot
                 error('More Gpus than available have been specified');
+            end
+            if isempty(AcqInfo.DataDims)
+                obj.DataDims = 'Traj2Traj';
+            else
+            	obj.DataDims = AcqInfo.DataDims;
+            end
+            if isempty(AcqInfo.DataOrder)
+                obj.BeneficiallyOrderDataForGpu = 0;
             end
             if obj.BeneficiallyOrderDataForGpu
                 if not(AcqInfo.Reordered)
@@ -69,10 +82,28 @@ classdef StitchItSuperRegridInputRxProf < handle
                     Data = reshape(DataArrReorder,sz(1),sz(2),sz(3));
                 end
             end
-            Nufft = NufftReturnChannels();
-            Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
-            Images = Nufft.Inverse(obj,Data);
-            Image = sum(Images.*conj(RxProfs),4);
+%-------------------------------------------------------- 
+%             Nufft = NufftReturnChannels();
+%             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
+%             Images = Nufft.Inverse(obj,Data);
+%             Image = sum(Images.*conj(RxProfs),4);
+%-------------------------------------------------------- 
+%--------------------------------------------------------           
+%             if obj.TestFov2ReturnGridMatrix
+%                 error('Test only for ReturnBaseMatrix');
+%             end
+%             Nufft = NufftIterate();                                   
+%             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs);
+%             Image = Nufft.Inverse(Data);
+%--------------------------------------------------------  
+%--------------------------------------------------------           
+            Nufft = NufftOffResIterate();                             
+            sz = size(RxProfs);
+            OffResMap = zeros(sz(1:3),'single');
+            OffResTimeArr = obj.AcqInfo.OffResTimeArr;
+            Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs,OffResMap,OffResTimeArr);
+            Image = Nufft.Inverse(Data);
+%--------------------------------------------------------  
         end
 
 %==================================================================

@@ -15,6 +15,7 @@ classdef StitchItReturnChannels < handle
         RxChannels
         Fov2Return = 'BaseMatrix'
         BeneficiallyOrderDataForGpu = 1
+        DataDims
     end
     
     methods 
@@ -36,10 +37,22 @@ classdef StitchItReturnChannels < handle
             obj.RxChannels = RxChannels;
             GpuTot = gpuDeviceCount;
             if isempty(obj.Gpus2Use)
-                obj.Gpus2Use = GpuTot;
+                if obj.RxChannels == 1
+                    obj.Gpus2Use = 1;
+                else
+                    obj.Gpus2Use = GpuTot;
+                end
             end
             if obj.Gpus2Use > GpuTot
                 error('More Gpus than available have been specified');
+            end
+            if isempty(AcqInfo.DataDims)
+                obj.DataDims = 'Traj2Traj';
+            else
+            	obj.DataDims = AcqInfo.DataDims;
+            end
+            if isempty(AcqInfo.DataOrder)
+                obj.BeneficiallyOrderDataForGpu = 0;
             end
             if obj.BeneficiallyOrderDataForGpu
                 if not(AcqInfo.Reordered)

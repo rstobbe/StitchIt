@@ -20,8 +20,13 @@ properties (SetAccess = private)
     Vox
     kMaxRad
     ReconInfoMat
+    DataDims 
     DataOrder
     Reordered = 0
+    OffResGridArr
+    OffResTimeArr
+    OffResGridBlockSize
+    OffResLastGridBlockSize
 end
 
 methods 
@@ -77,14 +82,30 @@ end
 function SetReconInfoMat(STCH,ReconInfoMat)     
     STCH.ReconInfoMat = ReconInfoMat;
 end
+function SetDataDimsTraj2Traj(STCH)     
+    STCH.DataDims = 'Traj2Traj';
+end
+function SetDataDimsPt2Pt(STCH)
+    STCH.DataDims = 'Pt2Pt';
+end
 function SetDataOrder(STCH,DataOrder)     
     STCH.DataOrder = DataOrder;
 end
 function SetReordered(STCH)     
     STCH.Reordered = 1;
 end
-
-
+function SetOffResGridArr(STCH,val)     
+    STCH.OffResGridArr = single(val);
+end
+function SetOffResTimeArr(STCH,val)     
+    STCH.OffResTimeArr = single(val);
+end
+function SetOffResGridBlockSize(STCH,val)     
+    STCH.OffResGridBlockSize = single(val);
+end
+function SetOffResLastGridBlockSize(STCH,val)     
+    STCH.OffResLastGridBlockSize = single(val);
+end
 
 end
 end

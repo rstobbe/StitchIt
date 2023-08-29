@@ -11,8 +11,7 @@ classdef NufftIterate < handle
         RxProfs
         BaseMatrix
         GridMatrix
-        NumTraj
-        NumCol
+        TempMatrix
         ChanPerGpu
         NumGpuUsed
         ReconRxBatches
@@ -20,8 +19,11 @@ classdef NufftIterate < handle
         TestTime
         ImageMemPin
         DataMemPin
+        ImageMemPinBool = 0
+        DataMemPinBool = 0
         NumRunsInverse
         NumRunsForward
+        SimulationScale = 0
     end
     
     methods 
@@ -32,7 +34,14 @@ classdef NufftIterate < handle
         function [obj] = NufftIterate()
             obj.NufftFuncs = NufftFunctions();
         end                        
-        
+
+%==================================================================
+% SetSimulationScale
+%==================================================================           
+        function SetSimulationScale(obj)
+            obj.SimulationScale = 1;
+        end
+
 %==================================================================
 % Initialize
 %==================================================================   
@@ -40,28 +49,34 @@ classdef NufftIterate < handle
             obj.NumGpuUsed = Stitch.Gpus2Use;
             obj.BaseMatrix = Stitch.BaseMatrix;
             obj.GridMatrix = Stitch.GridMatrix;
+            obj.TempMatrix = Stitch.BaseMatrix;
             obj.RxChannels = RxChannels;
-            obj.NumTraj = AcqInfo.NumTraj;
-            obj.NumCol = AcqInfo.NumCol;
             
             %--------------------------------------
             % Receive Batching
             %   - for limited memory GPUs (and/or many RxChannels)
             %--------------------------------------             
-            GridMemory = (obj.GridMatrix^3)*20;          % k-space + image + invfilt (complex & single)
-            BaseImageMemory = (obj.BaseMatrix^3)*8;
-            DataKspaceMemory = obj.NumTraj*obj.NumCol*16;
+            GridMemory = (obj.GridMatrix^3)*16;          % k-space + image (complex & single)
+            BaseImageMemory = (obj.BaseMatrix^3)*20;     % image + temp + invfilt (complex & single)
+            DataKspaceMemory = AcqInfo.NumTraj*AcqInfo.NumCol*16;
             TotalMemory = GridMemory + BaseImageMemory + DataKspaceMemory;
             AvailableMemory = obj.NufftFuncs.GpuParams.AvailableMemory;
             for n = 1:20
                 obj.ReconRxBatches = n;
                 obj.ChanPerGpu = ceil(obj.RxChannels/(obj.NumGpuUsed*obj.ReconRxBatches));
                 MemoryNeededTotal = TotalMemory + BaseImageMemory * obj.ChanPerGpu;
-                if MemoryNeededTotal*1.2 < AvailableMemory
+                if MemoryNeededTotal*1.15 < AvailableMemory
                     break
+                else
+                    if obj.ChanPerGpu == 1
+                        error('Not enough space on graphics card');
+                    end
                 end
             end
-            obj.ReconRxBatchLen = obj.ChanPerGpu * obj.NumGpuUsed;              
+            if obj.ReconRxBatches == 20
+                error('Not enough GPU memory');
+            end
+            obj.ReconRxBatchLen = obj.ChanPerGpu * obj.NumGpuUsed;
             
             %--------------------------------------
             % Nufft Initialize
@@ -71,6 +86,7 @@ classdef NufftIterate < handle
             %--------------------------------------
             % Load RxProfs
             %--------------------------------------   
+            obj.NufftFuncs.AllocateRcvrProfMatricesGpuMem;   
             if obj.ReconRxBatches == 1
                 obj.NufftFuncs.LoadRcvrProfMatricesGpuMum(RxProfs);
             else
@@ -84,17 +100,13 @@ classdef NufftIterate < handle
 % Inverse
 %================================================================== 
         function Image = Inverse(obj,Data)
-%             tic
-            Error = RegisterHostComplexMemCuda61(Data);
-            if not(strcmp(Error,'no error'))
-                error(Error);
+            if obj.RxChannels > 1
+                obj.NufftFuncs.RegisterHostComplexMemCuda(Data);
+                obj.DataMemPinBool = 1;
             end
             if obj.NumRunsInverse == 0 
                 obj.ImageMemPin = complex(zeros([obj.BaseMatrix obj.BaseMatrix obj.BaseMatrix,obj.ReconRxBatches*obj.NumGpuUsed],'single'),0);
-                Error = RegisterHostComplexMemCuda61(obj.ImageMemPin);
-                if not(strcmp(Error,'no error'))
-                    error(Error);
-                end
+                obj.NufftFuncs.RegisterHostComplexMemCuda(obj.ImageMemPin);
             end
             obj.NumRunsInverse = obj.NumRunsInverse+1;
             for q = 1:obj.ReconRxBatches 
@@ -109,24 +121,18 @@ classdef NufftIterate < handle
                 end
                 obj.NufftFuncs.InitializeBaseMatricesGpuMem;
                 for p = 1:obj.ChanPerGpu
-%---
-%                     obj.NufftFuncs.CudaDeviceWait(1);
-%                     tic
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
+                        ChanNum = (q-1)*obj.ReconRxBatchLen + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end
                         obj.NufftFuncs.LoadSampDatGpuMemAsyncCidx(GpuNum,Data,ChanNum);
                     end 
-%                     obj.NufftFuncs.CudaDeviceWait(1);
-%                     toc
-%---
                     obj.NufftFuncs.InitializeGridMatricesGpuMem;
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
+                        ChanNum = (q-1)*obj.ReconRxBatchLen + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end    
@@ -134,7 +140,7 @@ classdef NufftIterate < handle
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
+                        ChanNum = (q-1)*obj.ReconRxBatchLen + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end  
@@ -142,7 +148,7 @@ classdef NufftIterate < handle
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
+                        ChanNum = (q-1)*obj.ReconRxBatchLen + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end 
@@ -150,44 +156,34 @@ classdef NufftIterate < handle
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
+                        ChanNum = (q-1)*obj.ReconRxBatchLen + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        obj.NufftFuncs.ImageFourierTransformShift(GpuNum); 
+                        obj.NufftFuncs.ImageFourierTransformShiftReduceToTemp(GpuNum); 
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
+                        ChanNum = (q-1)*obj.ReconRxBatchLen + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        obj.NufftFuncs.MultInvFilt(GpuNum);
+                        obj.NufftFuncs.AccumBaseImagesWithRcvrs(GpuNum,p);
                     end
-                    for m = 1:obj.NumGpuUsed
-                        GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
-                        if ChanNum > obj.RxChannels
-                            break
-                        end 
-                        obj.NufftFuncs.AccumulateImage(GpuNum,p);
-                    end
+                end
+                for m = 1:obj.NumGpuUsed
+                    GpuNum = m-1;
+                    obj.NufftFuncs.MultInvFiltBase(GpuNum);
                 end
                 for m = 1:obj.NumGpuUsed
                     GpuNum = m-1;
                     obj.NufftFuncs.CudaDeviceWait(GpuNum);
                 end
-%---
-%                 obj.NufftFuncs.CudaDeviceWait(1);
-%                 tic
                 for m = 1:obj.NumGpuUsed
                     GpuNum = m-1;
-                    ReturnNum = (q-1)*obj.ReconRxBatches + m;
+                    ReturnNum = (q-1)*obj.ReconRxBatchLen + m;
                     obj.NufftFuncs.ReturnBaseImageCidx(GpuNum,obj.ImageMemPin,ReturnNum);
                 end
-%                 obj.NufftFuncs.CudaDeviceWait(1);
-%                 toc
-%---
             end
             for m = 1:obj.NumGpuUsed
                 GpuNum = m-1;
@@ -196,36 +192,27 @@ classdef NufftIterate < handle
             Image = sum(obj.ImageMemPin,4);
             Scale = 1/obj.NufftFuncs.ConvScaleVal * single(obj.NufftFuncs.BaseImageMatrixMemDims(1)).^1.5 / single(obj.NufftFuncs.GridImageMatrixMemDims(1))^3;
             Image = Image*Scale;
-            Error = UnRegisterHostMemCuda61(Data);
-            if not(strcmp(Error,'no error'))
-                error(Error);
-            end
+            obj.NufftFuncs.UnRegisterHostMemCuda(Data);
         end           
 
 %==================================================================
 % Forward
 %==================================================================         
         function Data = Forward(obj,Image)
-%             tic
-            Error = RegisterHostComplexMemCuda61(Image);
-            if not(strcmp(Error,'no error'))
-                error(Error);
-            end
-            if obj.NumRunsForward == 0 
-                obj.DataMemPin = complex(zeros([obj.NumCol,obj.NumTraj,obj.RxChannels],'single'),0);
-                Error = RegisterHostComplexMemCuda61(obj.DataMemPin);
-                if not(strcmp(Error,'no error'))
-                    error(Error);
+            obj.NufftFuncs.RegisterHostComplexMemCuda(Image);
+            if obj.NumRunsForward == 0
+                obj.DataMemPin = complex(zeros([obj.NufftFuncs.SampDatMemDims obj.RxChannels],'single'),0);
+                if obj.RxChannels > 1
+                    obj.NufftFuncs.RegisterHostComplexMemCuda(obj.DataMemPin);
+                    obj.DataMemPinBool = 1;
                 end
             end
             obj.NumRunsForward = obj.NumRunsForward+1;
-%---
-%             obj.NufftFuncs.CudaDeviceWait(1);
-%             tic
             obj.NufftFuncs.LoadImageMatrixGpuMem(Image);
-%             obj.NufftFuncs.CudaDeviceWait(1);
-%             toc
-%---
+            for m = 1:obj.NumGpuUsed
+                GpuNum = m-1;
+                obj.NufftFuncs.MultInvFiltBase(GpuNum);
+            end
             for q = 1:obj.ReconRxBatches 
                 RbStart = (q-1)*obj.ReconRxBatchLen + 1;
                 RbStop = q*obj.ReconRxBatchLen;
@@ -240,31 +227,23 @@ classdef NufftIterate < handle
                     obj.NufftFuncs.InitializeGridMatricesGpuMem;
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
+                        ChanNum = (q-1)*obj.ReconRxBatchLen + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        obj.NufftFuncs.RcvrWgtExpandImage(GpuNum,p);
+                        obj.NufftFuncs.RcvrWgtBaseImage(GpuNum,p);
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
+                        ChanNum = (q-1)*obj.ReconRxBatchLen + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end 
-                        obj.NufftFuncs.MultInvFilt(GpuNum);
+                        obj.NufftFuncs.ImageFourierTransformShiftExpandFromTemp(GpuNum); 
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
-                        if ChanNum > obj.RxChannels
-                            break
-                        end 
-                        obj.NufftFuncs.ImageFourierTransformShift(GpuNum); 
-                    end
-                    for m = 1:obj.NumGpuUsed
-                        GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
+                        ChanNum = (q-1)*obj.ReconRxBatchLen + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end 
@@ -272,7 +251,7 @@ classdef NufftIterate < handle
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
+                        ChanNum = (q-1)*obj.ReconRxBatchLen + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end  
@@ -280,7 +259,7 @@ classdef NufftIterate < handle
                     end
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
+                        ChanNum = (q-1)*obj.ReconRxBatchLen + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end    
@@ -290,32 +269,27 @@ classdef NufftIterate < handle
                         GpuNum = m-1;
                         obj.NufftFuncs.CudaDeviceWait(GpuNum);
                     end
-%---
-%                     obj.NufftFuncs.CudaDeviceWait(1);
-%                     tic 
                     for m = 1:obj.NumGpuUsed
                         GpuNum = m-1;
-                        ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
+                        ChanNum = (q-1)*obj.ReconRxBatchLen + (p-1)*obj.NumGpuUsed + m;
                         if ChanNum > obj.RxChannels
                             break
                         end 
                         obj.NufftFuncs.ReturnSampDatCidx(GpuNum,obj.DataMemPin,ChanNum);
                     end
-%                     obj.NufftFuncs.CudaDeviceWait(1);
-%                     toc
-%---
                 end
             end
             for m = 1:obj.NumGpuUsed
                 GpuNum = m-1;
                 obj.NufftFuncs.CudaDeviceWait(GpuNum);
             end
-            Scale = single(1/(obj.NufftFuncs.ConvScaleVal * obj.NufftFuncs.SubSamp.^3 * double(obj.NufftFuncs.BaseImageMatrixMemDims(1)).^1.5));
+            if obj.SimulationScale
+                Scale = single(1/(obj.NufftFuncs.ConvScaleVal * obj.NufftFuncs.SubSamp.^3));
+            else
+                Scale = single(1/(obj.NufftFuncs.ConvScaleVal * obj.NufftFuncs.SubSamp.^3 * double(obj.NufftFuncs.BaseImageMatrixMemDims(1)).^1.5));
+            end
             Data = obj.DataMemPin*Scale;
-            Error = UnRegisterHostMemCuda61(Image);
-            if not(strcmp(Error,'no error'))
-                error(Error);
-            end 
+            obj.NufftFuncs.UnRegisterHostMemCuda(Image);
 %             obj.NufftFuncs.CudaDeviceWait(1);
 %             obj.TestTime = [obj.TestTime toc];
 %             TestTotalTime = sum(obj.TestTime)
@@ -326,16 +300,12 @@ classdef NufftIterate < handle
 %================================================================== 
         function delete(obj)
             if not(isempty(obj.DataMemPin))
-                Error = UnRegisterHostMemCuda61(obj.DataMemPin);
-                if not(strcmp(Error,'no error'))
-                    error(Error);
+                if obj.DataMemPinBool
+                    obj.NufftFuncs.UnRegisterHostMemCuda(obj.DataMemPin);
                 end
             end
             if not(isempty(obj.ImageMemPin))
-                Error = UnRegisterHostMemCuda61(obj.ImageMemPin);
-                if not(strcmp(Error,'no error'))
-                    error(Error);
-                end
+                obj.NufftFuncs.UnRegisterHostMemCuda(obj.ImageMemPin);
             end
             obj.NufftFuncs.FreeGpuMem;
         end        

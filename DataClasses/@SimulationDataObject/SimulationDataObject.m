@@ -15,6 +15,7 @@ classdef SimulationDataObject < handle
         TotalAcqs
         DataFull
         FovShift = [0 0 0]
+        FirstSampDelay
     end
     methods 
 
@@ -24,6 +25,11 @@ classdef SimulationDataObject < handle
         function obj = SimulationDataObject(file)
             load(file);
             SAMP = saveData.SAMP;
+            if isprop(SAMP.KSMP,'Delay')
+                obj.FirstSampDelay = SAMP.KSMP.Delay;
+            else
+                obj.FirstSampDelay = 0;
+            end
             if ~iscell(SAMP.SampDat)
                 if ~isreal(SAMP.SampDat)
                     % 'old' simulation data...
@@ -41,7 +47,13 @@ classdef SimulationDataObject < handle
             end
             % NumTrajs / RxChannels / NumAverages should be the same for all
             sz = size(obj.DataFull{1});
-            obj.NumTrajs = sz(2);
+            TrajDim = 2;
+            if isfield(SAMP,'DataDims')
+                if strcmp(SAMP.DataDims,'Pt2Pt')
+                    TrajDim = 1;
+                end
+            end
+            obj.NumTrajs = sz(TrajDim);
             if length(sz) == 2
                 obj.RxChannels = 1;
                 obj.NumAverages = 1;
@@ -67,7 +79,11 @@ classdef SimulationDataObject < handle
             obj.DataInfo.TrajName = '';
             obj.DataInfo.TrajImpName = '';
             obj.DataInfo.RxChannels = 1;
-            obj.DataInfo.SimSampGridMatrix = SAMP.ZF;
+            if isfield(SAMP,'ZF')
+                obj.DataInfo.SimSampGridMatrix = SAMP.ZF;
+            elseif isfield(SAMP,'GridMatrix')
+                obj.DataInfo.SimSampGridMatrix = SAMP.GridMatrix;
+            end
         end
         
 %==================================================================

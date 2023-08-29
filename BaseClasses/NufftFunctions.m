@@ -45,18 +45,25 @@ classdef NufftFunctions < NufftGpu
             end 
             kShift = (Nufft.GridMatrix/2+1)-((kSz+1)/2);
             ConvScaleVal = KernHolder.Kernel.convscaleval;
-            ReconInfoMat(:,:,1:3) = SubSamp*(AcqInfo.ReconInfoMat(:,:,1:3)/kStep) + kMatCentre + kShift;     
-            ReconInfoMat(:,:,4) = AcqInfo.ReconInfoMat(:,:,4);
+            sz = size(AcqInfo.ReconInfoMat);
+            if sz(3) == 4
+                ReconInfoMat0 = permute(AcqInfo.ReconInfoMat,[3 1 2]);
+                ReconInfoMat(1:3,:,:) = SubSamp*(ReconInfoMat0(1:3,:,:)/kStep) + kMatCentre + kShift;     
+                ReconInfoMat(4,:,:) = ReconInfoMat0(4,:,:);
+            else
+                ReconInfoMat(1:3,:,:) = SubSamp*(AcqInfo.ReconInfoMat(1:3,:,:)/kStep) + kMatCentre + kShift;     
+                ReconInfoMat(4,:,:) = AcqInfo.ReconInfoMat(4,:,:);
+            end
             
             %--------------------------------------
             % Allocate GPU Memory
             %--------------------------------------
             obj.AllocateKspaceGridImageMatricesGpuMem([Nufft.GridMatrix Nufft.GridMatrix Nufft.GridMatrix]); 
-            obj.AllocateBaseImageMatricesGpuMem([Nufft.BaseMatrix Nufft.BaseMatrix Nufft.BaseMatrix]); 
-            obj.AllocateRcvrProfMatricesGpuMem;        
-            ReconInfoSize = [AcqInfo.NumCol AcqInfo.NumTraj 4];                 % Includes SDC
+            obj.AllocateTempMatrixGpuMem([Nufft.TempMatrix Nufft.TempMatrix Nufft.TempMatrix]); 
+            obj.AllocateBaseImageMatricesGpuMem([Nufft.BaseMatrix Nufft.BaseMatrix Nufft.BaseMatrix]);      
+            ReconInfoSize = [4 AcqInfo.NumTraj AcqInfo.NumCol];                 % Includes SDC (note, order important for off-res gridding)
             obj.AllocateReconInfoGpuMem(ReconInfoSize);                       
-            SampDatSize = [AcqInfo.NumCol AcqInfo.NumTraj];
+            SampDatSize = [AcqInfo.NumTraj AcqInfo.NumCol];
             obj.AllocateSampDatGpuMem(SampDatSize);
             
             %--------------------------------------

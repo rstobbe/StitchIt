@@ -17,6 +17,7 @@ extern "C" void ArrFreeSglOne(mwSize *GpuNum, mwSize *HMat, char *Error);
 extern "C" void ArrLoadSglAll(mwSize *GpuTot, float *Mat, mwSize *HMat, mwSize *ArrSz, char *Error);
 extern "C" void ArrLoadSglAllAsync(mwSize *GpuTot, float *Mat, mwSize *HMat, mwSize *ArrSz, char *Error);
 extern "C" void ArrLoadSglAllC(mwSize *GpuTot, float *Mat, mwSize *HMat, mwSize *ArrSz, char *Error);
+extern "C" void ArrLoadSglAllAsyncC(mwSize *GpuTot, float *Mat, mwSize *HMat, mwSize *ArrSz, char *Error);
 extern "C" void ArrLoadSglOne(mwSize *GpuNum, float *Mat, mwSize *HMat, mwSize *ArrSz, char *Error);
 extern "C" void ArrLoadSglOneC(mwSize *GpuNum, float *Mat, mwSize *HMat, mwSize *ArrSz, char *Error);
 extern "C" void ArrLoadSglSepC(mwSize *GpuNum, float *Mat, mwSize *HMat, mwSize *ArrSz, char *Error);

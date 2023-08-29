@@ -20,6 +20,7 @@ classdef StitchItWaveletInputRxProfIm0 < handle
         Lambda
         ItNum
         Nufft
+        DataDims
     end
     
     methods 
@@ -37,14 +38,26 @@ classdef StitchItWaveletInputRxProfIm0 < handle
         function Initialize(obj,AcqInfo,RxChannels) 
             DisplayStatusCompass('Initialize',3);
             obj.AcqInfo = AcqInfo;
-            obj.KernHolder.Initialize(obj.AcqInfo,obj);
+            obj.KernHolder.Initialize(AcqInfo,obj);
             obj.RxChannels = RxChannels;
             GpuTot = gpuDeviceCount;
             if isempty(obj.Gpus2Use)
-                obj.Gpus2Use = GpuTot;
+                if obj.RxChannels == 1
+                    obj.Gpus2Use = 1;
+                else
+                    obj.Gpus2Use = GpuTot;
+                end
             end
             if obj.Gpus2Use > GpuTot
                 error('More Gpus than available have been specified');
+            end
+            if isempty(AcqInfo.DataDims)
+                obj.DataDims = 'Traj2Traj';
+            else
+            	obj.DataDims = AcqInfo.DataDims;
+            end
+            if isempty(AcqInfo.DataOrder)
+                obj.BeneficiallyOrderDataForGpu = 0;
             end
             if obj.BeneficiallyOrderDataForGpu
                 if not(AcqInfo.Reordered)
@@ -56,7 +69,7 @@ classdef StitchItWaveletInputRxProfIm0 < handle
                     AcqInfo.SetReordered;
                 end
             end
-        end    
+        end  
         
 %==================================================================
 % CreateImage
@@ -75,7 +88,7 @@ classdef StitchItWaveletInputRxProfIm0 < handle
                 end
             end
             ReconInfoMat = obj.AcqInfo.ReconInfoMat;
-            ReconInfoMat(:,:,4) = 1;                            % set sampling density compensation to '1'. 
+            ReconInfoMat(4,:,:) = 1;                            % set sampling density compensation to '1'. 
             obj.AcqInfo.SetReconInfoMat(ReconInfoMat); 
             obj.Nufft = NufftIterate();
             obj.Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs);
