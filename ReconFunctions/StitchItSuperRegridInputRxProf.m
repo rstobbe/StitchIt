@@ -83,10 +83,10 @@ classdef StitchItSuperRegridInputRxProf < handle
                 end
             end
 %-------------------------------------------------------- 
-%             Nufft = NufftReturnChannels();
-%             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
-%             Images = Nufft.Inverse(obj,Data);
-%             Image = sum(Images.*conj(RxProfs),4);
+            Nufft = NufftReturnChannels();
+            Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
+            Images = Nufft.Inverse(obj,Data);
+            Image = sum(Images.*conj(RxProfs),4);
 %-------------------------------------------------------- 
 %--------------------------------------------------------           
 %             if obj.TestFov2ReturnGridMatrix
@@ -97,12 +97,12 @@ classdef StitchItSuperRegridInputRxProf < handle
 %             Image = Nufft.Inverse(Data);
 %--------------------------------------------------------  
 %--------------------------------------------------------           
-            Nufft = NufftOffResIterate();                             
-            sz = size(RxProfs);
-            OffResMap = zeros(sz(1:3),'single');
-            OffResTimeArr = obj.AcqInfo.OffResTimeArr;
-            Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs,OffResMap,OffResTimeArr);
-            Image = Nufft.Inverse(Data);
+%             Nufft = NufftOffResIterate();                             
+%             sz = size(RxProfs);
+%             OffResMap = zeros(sz(1:3),'single');
+%             OffResTimeArr = obj.AcqInfo.OffResTimeArr;
+%             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs,OffResMap,OffResTimeArr);
+%             Image = Nufft.Inverse(Data);
 %--------------------------------------------------------  
         end
 
