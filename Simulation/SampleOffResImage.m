@@ -55,7 +55,7 @@ classdef SampleOffResImage < handle
             Nufft.SetSimulationScale;
             Data = Nufft.Forward(Image);
             clear Nufft;
-            DisplayClearStatusCompass();
+            %DisplayClearStatusCompass();
         end
 
 %==================================================================

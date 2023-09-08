@@ -17,6 +17,7 @@ classdef SiemensStitchItDataObject < handle
         RxChannels;
         NumAverages;
         FovShift = [0 0 0]
+        FirstSampDelay
     end
     methods 
 
@@ -55,7 +56,7 @@ classdef SiemensStitchItDataObject < handle
 %==================================================================
 % ReturnAllData
 %================================================================== 
-        function AllData = ReturnAllData(obj,AcqInfo)
+        function Data = ReturnAllData(obj,AcqInfo)
             QDataMemPosArr = uint64(obj.DataMem.Pos(:) + obj.DataScanHeaderBytes);                                  
             QDataReadSize = obj.DataChannelHeaderBytes/8 + obj.DataDims.NCol;
             QDataStart = obj.DataChannelHeaderBytes/8 + AcqInfo.SampStart;
@@ -63,10 +64,26 @@ classdef SiemensStitchItDataObject < handle
             QDataCha = obj.DataDims.NCha;
             QDataBlockLength = length(obj.DataMem.Pos);
             QDataInfo = uint64([QDataReadSize QDataStart QDataCol QDataCha QDataBlockLength]);
-            AllData = BuildComplexDataArray([obj.DataPath,obj.DataFile],QDataMemPosArr,QDataInfo);
-            AllData = AllData * 1000;
+            Data = 1000 * BuildComplexDataArray([obj.DataPath,obj.DataFile],QDataMemPosArr,QDataInfo);
+            Data = permute(Data,[2 1 3]);       % for now
         end        
 
+%==================================================================
+% ReturnDataSet
+%================================================================== 
+        function Data = ReturnDataSet(obj,AcqInfo,ReconNumber)       
+            QDataMemPosArr = uint64(obj.DataMem.Pos(AcqInfo.TrajsInSet) + obj.DataScanHeaderBytes);                                  
+            QDataReadSize = obj.DataChannelHeaderBytes/8 + obj.DataDims.NCol;
+            QDataStart = obj.DataChannelHeaderBytes/8 + AcqInfo.SampStart;
+            QDataCol = AcqInfo.NumCol;
+            QDataCha = obj.DataDims.NCha;
+            QDataBlockLength = length(QDataMemPosArr);
+            QDataInfo = uint64([QDataReadSize QDataStart QDataCol QDataCha QDataBlockLength]);
+            Data = 1000 * BuildComplexDataArray([obj.DataPath,obj.DataFile],QDataMemPosArr,QDataInfo);
+            Data = permute(Data,[2 1 3]);       % for now
+            obj.FirstSampDelay = obj.DataInfo.ExpPars.FirstSampDelay;
+        end
+        
 %==================================================================
 % ScaleData
 %==================================================================   

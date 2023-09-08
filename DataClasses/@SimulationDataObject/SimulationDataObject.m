@@ -108,10 +108,10 @@ classdef SimulationDataObject < handle
         end        
         
 %==================================================================
-% ReturnAllData
+% ReturnDataSet
 %================================================================== 
-        function Data = ReturnAllData(obj,AcqInfo)  
-            Data = obj.DataFull{1};
+        function Data = ReturnDataSet(obj,AcqInfo,SetNum)  
+            Data = obj.DataFull{SetNum};
         end        
         
             

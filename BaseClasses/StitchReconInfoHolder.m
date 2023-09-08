@@ -27,6 +27,8 @@ properties (SetAccess = private)
     OffResTimeArr
     OffResGridBlockSize
     OffResLastGridBlockSize
+    TrajsInSet
+    Type                        % 1 = scan / 2 = offresmap
 end
 
 methods 
@@ -105,6 +107,12 @@ function SetOffResGridBlockSize(STCH,val)
 end
 function SetOffResLastGridBlockSize(STCH,val)     
     STCH.OffResLastGridBlockSize = single(val);
+end
+function SetTrajsInSet(STCH,val)     
+    STCH.TrajsInSet = val;
+end
+function SetTypeOffResMap(STCH)     
+    STCH.Type = 2;
 end
 
 end
