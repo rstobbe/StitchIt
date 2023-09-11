@@ -206,7 +206,7 @@ classdef NufftOffResIterate < handle
                 end
                 for m = 1:obj.NumGpuUsed
                     GpuNum = m-1;
-                    ReturnNum = (q-1)*obj.ReconRxBatchLen + m;
+                    ReturnNum = (q-1)*obj.NumGpuUsed + m;
                     obj.NufftFuncs.ReturnBaseHoldImageCidx(GpuNum,obj.ImageMemPin,ReturnNum);
                 end
             end
