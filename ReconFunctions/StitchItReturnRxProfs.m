@@ -92,13 +92,13 @@ classdef StitchItReturnRxProfs < handle
             LowResImages = Nufft.Inverse(obj,Data);
             LowResSos = sum(abs(LowResImages).^2,4);
             %----
-            %LowResSos(LowResSos < 0.01) = 0.01;            % no good - don't do
+            %LowResSos(LowResSos < 0.01) = 0.01;                % no good - don't do
             %----
             RxProfs = LowResImages./sqrt(LowResSos);
             %----
-            Mask = LowResSos < 0.05;
-            MaskMat = repmat(Mask,1,1,1,obj.RxChannels);
-            RxProfs(MaskMat) = 1;
+            %Mask = LowResSos < 0.05;                           % no good - don't do
+            %MaskMat = repmat(Mask,1,1,1,obj.RxChannels);
+            %RxProfs(MaskMat) = 1;
             %----
         end
 
