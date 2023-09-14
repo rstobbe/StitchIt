@@ -91,6 +91,9 @@ classdef StitchItReturnRxProfs < handle
             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
             LowResImages = Nufft.Inverse(obj,Data);
             LowResSos = sum(abs(LowResImages).^2,4);
+            %----
+            LowResSos(LowResSos < 0.01) = 0.01;
+            %----
             RxProfs = LowResImages./sqrt(LowResSos);
         end
 
