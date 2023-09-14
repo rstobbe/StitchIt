@@ -174,6 +174,7 @@ DATA.DataHdr = Hdr;
 DATA.DataDims = Dims;
 DATA.DataMem = Mem;
 DATA.DataInfo = Info;
+DATA.FovShift = Info.ExpPars.shift;
 
 
 end

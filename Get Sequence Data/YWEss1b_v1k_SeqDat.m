@@ -67,10 +67,10 @@ ExpPars.Sequence.flamplitude = 'N/A On XA30';
 %---------------------------------------------
 % Position Info
 %---------------------------------------------
-if isfield(MrProt.sAAInitialOffset,'SliceInformation');  
+if isfield(MrProt.sAAInitialOffset,'SliceInformation')
     SliceInformation = MrProt.sAAInitialOffset.SliceInformation;
     ExpPars.shift = zeros(1,3);
-    if isfield(SliceInformation,'sPosition'); 
+    if isfield(SliceInformation,'sPosition')
         if isfield(SliceInformation.sPosition,'dSag')
             ExpPars.shift(1) = SliceInformation.sPosition.dSag;
         else
