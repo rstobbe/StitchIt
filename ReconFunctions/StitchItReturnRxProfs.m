@@ -92,7 +92,7 @@ classdef StitchItReturnRxProfs < handle
             LowResImages = Nufft.Inverse(obj,Data);
             LowResSos = sum(abs(LowResImages).^2,4);
             %----
-            LowResSos(LowResSos < 0.01) = 0.01;
+            %LowResSos(LowResSos < 0.01) = 0.01;            % no good - don't do
             %----
             RxProfs = LowResImages./sqrt(LowResSos);
         end
