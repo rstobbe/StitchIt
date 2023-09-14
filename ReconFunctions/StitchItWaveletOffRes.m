@@ -16,9 +16,12 @@ classdef StitchItWaveletOffRes < handle
         Fov2Return = 'BaseMatrix'
         LevelsPerDim = [1 1 1]
         NumIterations = 50
+        MaxEig
         Lambda
         ItNum
         Nufft
+        DisplayResult = 0
+        DisplayIterationStep = 1
     end
     
     methods 
@@ -69,9 +72,13 @@ classdef StitchItWaveletOffRes < handle
             Wave = dwt(obj.LevelsPerDim,size(Image0),isDec);  
             Func = @(x,transp) obj.IterateFunc(x,transp);
             Opt = [];
+            Opt.maxEig = obj.MaxEig;
             obj.ItNum = 1;
+            %--
             %[Image,resSqAll,RxAll,mseAll] = bfista(Func,Data,Wave,obj.Lambda,Image0,obj.NumIterations,Opt);
-            Image = bfista(Func,Data,Wave,obj.Lambda,Image0,obj.NumIterations,Opt);
+            Image = bfista_rws(Func,Data,Wave,obj.Lambda,Image0,obj.NumIterations,Opt,obj);
+            %Image = bfista(Func,Data,Wave,obj.Lambda,Image0,obj.NumIterations,Opt);
+            %--
             clear Nufft
             DisplayClearStatusCompass();
         end
@@ -93,7 +100,7 @@ classdef StitchItWaveletOffRes < handle
 % DisplayCount
 %==================================================================           
         function DisplayCount(obj) 
-            DisplayStatusCompass(['Create Iterative Image' num2str(obj.ItNum)],3); 
+            DisplayStatusCompass(['Compressed Sensing ' num2str(obj.ItNum)],3); 
             obj.ItNum = obj.ItNum + 1;
         end        
         
@@ -138,7 +145,14 @@ classdef StitchItWaveletOffRes < handle
         function SetLevelsPerDim(obj,val)
             obj.LevelsPerDim = val;
         end         
- 
+
+%==================================================================
+% SetMaxEig
+%==================================================================   
+        function SetMaxEig(obj,val)
+            obj.MaxEig = val;
+        end          
+        
 %==================================================================
 % SetNumIterations
 %==================================================================         
@@ -168,6 +182,20 @@ classdef StitchItWaveletOffRes < handle
         end          
 
 %==================================================================
+% SetDisplayResultOn
+%==================================================================         
+        function SetDisplayResultOn(obj)
+            obj.DisplayResult = 1;
+        end         
+
+%==================================================================
+% SetDisplayIterationStep
+%==================================================================         
+        function SetDisplayIterationStep(obj,val)
+            obj.DisplayIterationStep = val;
+        end           
+        
+%==================================================================
 % TestFov2ReturnGridMatrix
 %==================================================================         
         function bool = TestFov2ReturnGridMatrix(obj)
@@ -176,10 +204,19 @@ classdef StitchItWaveletOffRes < handle
                 bool = 1;
             end
         end            
-                     
 
-        
-    end
+%==================================================================
+% IterationAnalysis
+%==================================================================            
+        function IterationAnalysis(obj,Image,nit) 
+            if obj.DisplayResult
+                if rem(nit,obj.DisplayIterationStep) == 0
+                    totgblnum = ImportImageCompass(Image,['CsIt',num2str(nit)]);
+                    Gbl2ImageOrtho('IM3',totgblnum);
+                end
+            end
+        end
+
 end
-
+end
 

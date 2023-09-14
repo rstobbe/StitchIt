@@ -2,7 +2,7 @@
 % CompassImageCompass
 %================================================================== 
 
-function ImportImageCompass(Image,Name,Save,Path)
+function totgblnum = ImportImageCompass(Image,Name,Save,Path)
 
     if nargin < 3
         Save = 0;
@@ -52,7 +52,7 @@ function ImportImageCompass(Image,Name,Save,Path)
     totalgbl{1} = IMG.name;
     totalgbl{2} = IMG;
     from = 'CompassLoad';
-    Load_TOTALGBL(totalgbl,'IM',from);
+    totgblnum = Load_TOTALGBL(totalgbl,'IM',from);
 
     %----------------------------------------------
     % Save
