@@ -95,6 +95,11 @@ classdef StitchItReturnRxProfs < handle
             %LowResSos(LowResSos < 0.01) = 0.01;            % no good - don't do
             %----
             RxProfs = LowResImages./sqrt(LowResSos);
+            %----
+            Mask = LowResSos < 0.05;
+            MaskMat = repmat(Mask,1,1,1,obj.RxChannels);
+            RxProfs(MaskMat) = 1;
+            %----
         end
 
 %==================================================================
