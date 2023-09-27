@@ -32,7 +32,7 @@ function totgblnum = ImportOffResMapCompass(Image,Name,Save,Path,MaxOffRes)
     %----------------------------------------------
     % Set Up Compass Display
     %----------------------------------------------
-    MSTRCT.type = 'real';
+    MSTRCT.type = 'map';
     MSTRCT.dispwid = [-MaxOffRes MaxOffRes];
     MSTRCT.ImInfo.pixdim = [1 1 1];
     MSTRCT.ImInfo.vox = 1;

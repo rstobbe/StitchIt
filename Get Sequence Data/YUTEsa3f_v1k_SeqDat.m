@@ -44,6 +44,9 @@ ExpPars.Sequence.tr = MrProt.alTR{1}/1e3;                        % in ms
 ExpPars.Sequence.te = MrProt.alTE{1}/1e3;                        % in ms
 ExpPars.rcvrs = DataInfo.NCha;
 ExpPars.averages = DataInfo.NAve;
+%--
+ExpPars.FirstSampDelay = ExpPars.Sequence.te;                       % te might actually be associated with a later sampling point
+%--
 
 %---------------------------------------------
 % Other Info
@@ -64,7 +67,8 @@ ExpPars.Sequence.rfspoil = test2{10};
 %---------------------------------------------
 % Testing Info
 %---------------------------------------------
-ExpPars.Sequence.flamplitude = MrProt.sTXSPEC.aRFPULSE{1}.flAmplitude;
+%ExpPars.Sequence.flamplitude = MrProt.sTXSPEC.aRFPULSE{1}.flAmplitude;
+ExpPars.Sequence.flamplitude = 'N/A On XA30';
 
 %---------------------------------------------
 % Position Info
