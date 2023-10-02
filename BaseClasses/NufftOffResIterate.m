@@ -68,7 +68,8 @@ classdef NufftOffResIterate < handle
                 obj.ReconRxBatches = n;
                 obj.ChanPerGpu = ceil(obj.RxChannels/(obj.NumGpuUsed*obj.ReconRxBatches));
                 MemoryNeededTotal = TotalMemory + BaseImageMemory * obj.ChanPerGpu;
-                if MemoryNeededTotal*1.15 < AvailableMemory
+                if MemoryNeededTotal*1.2 < AvailableMemory
+                %if MemoryNeededTotal*1.15 < AvailableMemory
                     break
                 else
                     if obj.ChanPerGpu == 1
