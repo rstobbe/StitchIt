@@ -67,7 +67,11 @@ classdef StitchItWaveletOffRes < handle
             ReconInfoMat(4,:,:) = 1;                            % set sampling density compensation to '1'. 
             obj.AcqInfo.SetReconInfoMat(ReconInfoMat); 
             obj.Nufft = NufftOffResIterate();
-            obj.Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs,OffResMap,OffResTimeArr);
+            sz = size(OffResMap);
+%---------------------
+            OtherGpuMemNeeded = sz(1)^3 * 8 * 16;               % wavelet holders + temp
+            obj.Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs,OffResMap,OffResTimeArr,OtherGpuMemNeeded);
+%---------------------
             isDec = 0;                                          % Non-decimated to avoid blocky edges
             Wave = dwt(obj.LevelsPerDim,size(Image0),isDec);  
             Func = @(x,transp) obj.IterateFunc(x,transp);

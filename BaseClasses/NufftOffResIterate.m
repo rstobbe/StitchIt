@@ -48,7 +48,12 @@ classdef NufftOffResIterate < handle
 %==================================================================
 % Initialize
 %==================================================================   
-        function Initialize(obj,Stitch,KernHolder,AcqInfo,RxChannels,RxProfs,OffResMap,OffResTimeArr)
+        function Initialize(obj,Stitch,KernHolder,AcqInfo,RxChannels,RxProfs,OffResMap,OffResTimeArr,OtherGpuMemNeeded)
+            
+            if nargin < 9
+                OtherGpuMemNeeded = 0;
+            end
+            
             obj.NumGpuUsed = Stitch.Gpus2Use;
             obj.BaseMatrix = Stitch.BaseMatrix;
             obj.GridMatrix = Stitch.GridMatrix;
@@ -62,14 +67,13 @@ classdef NufftOffResIterate < handle
             GridMemory = (obj.GridMatrix^3)*16;          % k-space + image (complex & single)
             BaseImageMemory = (obj.BaseMatrix^3)*36;     % basehold + image + temp + offresmap + invfilt (complex & single)
             DataKspaceMemory = AcqInfo.NumTraj*AcqInfo.NumCol*16;
-            TotalMemory = GridMemory + BaseImageMemory + DataKspaceMemory;
+            TotalMemory = GridMemory + BaseImageMemory + DataKspaceMemory + OtherGpuMemNeeded;
             AvailableMemory = obj.NufftFuncs.GpuParams.AvailableMemory;
             for n = 1:20
                 obj.ReconRxBatches = n;
                 obj.ChanPerGpu = ceil(obj.RxChannels/(obj.NumGpuUsed*obj.ReconRxBatches));
                 MemoryNeededTotal = TotalMemory + BaseImageMemory * obj.ChanPerGpu;
-                if MemoryNeededTotal*1.2 < AvailableMemory
-                %if MemoryNeededTotal*1.15 < AvailableMemory
+                if MemoryNeededTotal*1.1 < AvailableMemory
                     break
                 else
                     if obj.ChanPerGpu == 1
