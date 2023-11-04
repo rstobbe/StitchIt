@@ -81,6 +81,20 @@ classdef SiemensStitchItDataObject < handle
             PhaseShiftMat = repmat(PhaseShift,1,1,obj.RxChannels);
             Data = Data.*PhaseShiftMat;
         end
+
+%==================================================================
+% ReturnDataSetWithExternalShift
+%================================================================== 
+        function Data = ReturnDataSetWithExternalShift(obj,AcqInfo,ReconNumber,ExtFovShift) 
+            Data = obj.ReturnDataSet(AcqInfo,ReconNumber); 
+            ReconInfoMat = AcqInfo.ReconInfoMat(1:3,:,:);
+            ScaledFovShift(1) = -ExtFovShift(2)/1000;
+            ScaledFovShift(2) = ExtFovShift(1)/1000;
+            ScaledFovShift(3) = -ExtFovShift(3)/1000;
+            PhaseShift = exp(-1i*2*pi*squeeze(pagemtimes(ScaledFovShift,ReconInfoMat)));
+            PhaseShiftMat = repmat(PhaseShift,1,1,obj.RxChannels);
+            Data = Data.*PhaseShiftMat;
+        end        
         
 %==================================================================
 % ReturnDataSet

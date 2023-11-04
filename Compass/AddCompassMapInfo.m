@@ -8,7 +8,8 @@ function IMG = AddCompassMapInfo(Image,DataObj,AcqInfo,StitchIt,ReconPanelOutput
     IMG.Im = Image;  
     Info = DataObj.DataInfo;           
     IMG.ExpPars = Info.ExpPars;
-
+    IMG.FovShift = DataObj.FovShift;
+    
     Panel(1,:) = {'','','Output'};
     Panel(2,:) = {'Recon Function',IMG.Method,'Output'};
     PanelOutput0 = cell2struct(Panel,{'label','value','type'},2);

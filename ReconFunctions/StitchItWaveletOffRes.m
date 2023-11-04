@@ -22,6 +22,8 @@ classdef StitchItWaveletOffRes < handle
         Nufft
         DisplayResult = 0
         DisplayIterationStep = 1
+        SaveIterationStep = 0
+        SaveIterationPath = ''
     end
     
     methods 
@@ -77,6 +79,7 @@ classdef StitchItWaveletOffRes < handle
             Func = @(x,transp) obj.IterateFunc(x,transp);
             Opt = [];
             Opt.maxEig = obj.MaxEig;
+            Opt.resThresh = 1e-9;               % go by iterations
             obj.ItNum = 1;
             %--
             %[Image,resSqAll,RxAll,mseAll] = bfista(Func,Data,Wave,obj.Lambda,Image0,obj.NumIterations,Opt);
@@ -198,6 +201,20 @@ classdef StitchItWaveletOffRes < handle
         function SetDisplayIterationStep(obj,val)
             obj.DisplayIterationStep = val;
         end           
+
+%==================================================================
+% SetSaveIterationStep
+%==================================================================         
+        function SetSaveIterationStep(obj)
+            obj.SaveIterationStep = 1;
+        end          
+
+%==================================================================
+% SetSaveIterationPath
+%==================================================================         
+        function SetSaveIterationPath(obj,val)
+            obj.SaveIterationPath = val;
+        end           
         
 %==================================================================
 % TestFov2ReturnGridMatrix
@@ -215,7 +232,7 @@ classdef StitchItWaveletOffRes < handle
         function IterationAnalysis(obj,Image,nit) 
             if obj.DisplayResult
                 if rem(nit,obj.DisplayIterationStep) == 0
-                    totgblnum = ImportImageCompass(Image,['CsIt',num2str(nit)]);
+                    totgblnum = ImportImageCompass(Image,['CsIt',num2str(nit)],obj.SaveIterationStep,obj.SaveIterationPath);
                     Gbl2ImageOrtho('IM3',totgblnum);
                 end
             end
