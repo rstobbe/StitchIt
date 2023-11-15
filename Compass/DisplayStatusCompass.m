@@ -2,9 +2,16 @@
 % DisplayStatusCompass
 %================================================================== 
 
-function DisplayStatusCompass(String,Level)
+function DisplayStatusCompass(ReconObj,String,Level)
 
-    Status2('busy',String,Level);
+    if nargin == 3
+        if ReconObj.CompassCalling
+            Status2('busy',String,Level);
+        end
+    else
+        disp('String');
+    end
+        
     
 end
 

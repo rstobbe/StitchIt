@@ -3,7 +3,7 @@
 %   
 %================================================================
 
-classdef StitchItReturnRxProfs < handle
+classdef StitchItSuperRegridInputRxProfOffRes < handle
 
     properties (SetAccess = private)                                     
         StitchSupportingPath
@@ -23,7 +23,7 @@ classdef StitchItReturnRxProfs < handle
 %==================================================================
 % Constructor
 %==================================================================   
-        function [obj] = StitchItReturnRxProfs()
+        function [obj] = StitchItSuperRegridInputRxProfOffRes()
             obj.KernHolder = NufftKernelHolder();
         end       
 
@@ -31,7 +31,6 @@ classdef StitchItReturnRxProfs < handle
 % Setup
 %==================================================================   
         function Initialize(obj,AcqInfo,RxChannels) 
-            DisplayStatusCompass('Initialize',3);
             obj.AcqInfo = AcqInfo;
             obj.KernHolder.Initialize(AcqInfo,obj);
             obj.RxChannels = RxChannels;
@@ -69,13 +68,7 @@ classdef StitchItReturnRxProfs < handle
 %==================================================================
 % CreateImage
 %==================================================================         
-        function RxProfs = CreateImage(obj,Data)
-            DisplayStatusCompass('Estimate Receiver Profiles',3); 
-            if strcmp(obj.DataDims,'Traj2Traj')
-                Data = Data(1:obj.AcqInfo.NumCol,:,:);
-            elseif strcmp(obj.DataDims,'Pt2Pt')
-                Data = Data(:,1:obj.AcqInfo.NumCol,:);
-            end
+        function Image = CreateImage(obj,Data,RxProfs,OffResMap,OffResTimeArr)
             if obj.BeneficiallyOrderDataForGpu
                 sz = size(Data);
                 if length(sz) == 2
@@ -87,19 +80,25 @@ classdef StitchItReturnRxProfs < handle
                     Data = reshape(DataArrReorder,sz(1),sz(2),sz(3));
                 end
             end
-            Nufft = NufftReturnChannels();
-            Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
-            LowResImages = Nufft.Inverse(obj,Data);
-            LowResSos = sum(abs(LowResImages).^2,4);
-            %----
-            %LowResSos(LowResSos < 0.01) = 0.01;                % no good - don't do
-            %----
-            RxProfs = LowResImages./sqrt(LowResSos);
-            %----
-            %Mask = LowResSos < 0.05;                           % no good - don't do
-            %MaskMat = repmat(Mask,1,1,1,obj.RxChannels);
-            %RxProfs(MaskMat) = 1;
-            %----
+%-------------------------------------------------------- 
+%             Nufft = NufftReturnChannels();
+%             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
+%             Images = Nufft.Inverse(obj,Data);
+%             Image = sum(Images.*conj(RxProfs),4);
+%-------------------------------------------------------- 
+%--------------------------------------------------------           
+%             if obj.TestFov2ReturnGridMatrix
+%                 error('Test only for ReturnBaseMatrix');
+%             end
+%             Nufft = NufftIterate();                                   
+%             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs);
+%             Image = Nufft.Inverse(Data);
+%--------------------------------------------------------  
+%--------------------------------------------------------           
+            Nufft = NufftOffResIterate();                             
+            Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs,OffResMap,OffResTimeArr);
+            Image = Nufft.Inverse(Data);
+%--------------------------------------------------------  
         end
 
 %==================================================================
