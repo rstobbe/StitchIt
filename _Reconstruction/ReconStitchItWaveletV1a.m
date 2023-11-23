@@ -3,19 +3,23 @@
 %   - If multi-image experiment, coil profile from first image
 %==================================================================
 
-classdef ReconNufftV1a < handle
+classdef ReconStitchItWaveletV1a < handle
 
 properties (SetAccess = private)                   
-    Method = 'ReconNufftV1a'
+    Method = 'ReconStitchItWaveletV1a'
     BaseMatrix
     AcqInfo
     AcqInfoRxp
-    ReconNumber = 1
+    ReconNumber
     Rcvrs
     OffResMap
     Shift
+    LevelsPerDim
+    NumIterations
+    Lambda
+    MaxEig
     UseExternalShift = 0
-    OffResCorrection = 0
+    OffResCorrection = 1
     ResetGpus = 1
     DispStatObj
 end
@@ -25,7 +29,7 @@ methods
 %==================================================================
 % Constructor
 %==================================================================  
-function ReconObj = ReconNufftV1a()              
+function ReconObj = ReconStitchItWaveletV1a() 
     ReconObj.DispStatObj = DisplayStatusObject();
 end
 
@@ -34,7 +38,7 @@ end
 %==================================================================  
 function [Image,err] = CreateImage(ReconObj,DataObjArr)     
     %% Test  
-    DataObj0 = DataObjArr{1}.DataObj;
+    DataObj0 = DataObjArr{1}.DataObj; 
     ReconObj.DispStatObj.SetDataObj(DataObj0);
     err.flag = 0;
     if ~strcmp(ReconObj.AcqInfo{ReconObj.ReconNumber}.name,DataObj0.DataInfo.TrajName)
@@ -98,8 +102,8 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     %% Sampling Timing
     OffResTimeArr = ReconObj.AcqInfo{ReconObj.ReconNumber}.OffResTimeArr;
     
-    %% Image
-    ReconObj.DispStatObj.Status('Nufft Recon',2);
+    %% Initial Images
+    ReconObj.DispStatObj.Status('Initial Images',2);
     ReconObj.DispStatObj.Status('Initialize',3);
     if ReconObj.OffResCorrection
         StitchIt = StitchNufftOffResV1a();
@@ -109,9 +113,8 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
     StitchIt.SetFov2ReturnBaseMatrix;
     StitchIt.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels); 
-    Image = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,length(DataObjArr)],'like',RxProfs);
+    Image0 = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,length(DataObjArr)],'like',RxProfs);
     for n = 1:length(DataObjArr)
-        ReconObj.DispStatObj.Status(['Nufft Recon ',num2str(n)],2);
         ReconObj.DispStatObj.Status('Load Data',3);
         if ReconObj.UseExternalShift
             Data = DataObjArr{n}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
@@ -121,14 +124,57 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
         Data = DataObjArr{n}.DataObj.ScaleData(StitchIt,Data);
         ReconObj.DispStatObj.Status('Generate',3);
         if ReconObj.OffResCorrection
-            Image(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,OffResMapInt,OffResTimeArr);
+            Image0(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,OffResMapInt,OffResTimeArr);
         else
-            Image(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs);
+            Image0(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs);
         end
     end
+    ReconObj.DispStatObj.TestDisplayInitialImages(Image0);
     clear StichIt
+    
+    %% Wavelet 
+    ReconObj.DispStatObj.Status('StichItWavelet',2);    
+    ReconObj.DispStatObj.Status('Initialize',3);
+    if ReconObj.OffResCorrection
+        StitchIt = StitchItWaveletOffResV1a(); 
+    else
+        StitchIt = StitchItWaveletV1a();
+    end
+    StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
+    StitchIt.SetLevelsPerDim(ReconObj.LevelsPerDim);
+    StitchIt.SetNumIterations(ReconObj.NumIterations);
+    StitchIt.SetLambda(ReconObj.Lambda);
+    StitchIt.SetMaxEig(ReconObj.MaxEig);      
+    RxChannels = DataObj0.RxChannels;
+    StitchIt.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},RxChannels,ReconObj.DispStatObj); 
+    Image = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,length(DataObjArr)],'like',RxProfs);
+    for n = 1:length(DataObjArr)
+        if ReconObj.ResetGpus
+            ReconObj.DispStatObj.Status('Reset GPUs',2);            % Would be nice to fix the memory leak
+            for m = 1:gpuDeviceCount
+                gpuDevice(m);
+            end
+        end 
+        ReconObj.DispStatObj.Status('Load Data',3);
+        if length(DataObjArr) > 1
+            if ReconObj.UseExternalShift
+                Data = DataObjArr{n}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
+            else
+                Data = DataObjArr{n}.DataObj.ReturnDataSetWithShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber);
+            end
+        end
+        Data = DataObjArr{n}.DataObj.ScaleData(StitchIt,Data);
+        ReconObj.DispStatObj.Status('Generate',3);
+        if ReconObj.OffResCorrection
+            Image(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,OffResMapInt,OffResTimeArr,Image0(:,:,:,n));
+        else
+            Image(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,Image0(:,:,:,n));
+        end
+        AbsMaxEig(n) = abs(StitchIt.MaxEig);
+    end
+    ReconObj.SetMaxEig(AbsMaxEig);
+    clear StitchIt
     ReconObj.DispStatObj.StatusClear();
-
 end
 
 %==================================================================
@@ -166,13 +212,36 @@ end
 function SetUseExternalShift(ReconObj,val)    
     ReconObj.UseExternalShift = val;
 end
+function SetLevelsPerDim(ReconObj,val)    
+    ReconObj.LevelsPerDim = val;
+end
+function SetLambda(ReconObj,val)    
+    ReconObj.Lambda = val;
+end
+function SetNumIterations(ReconObj,val)    
+    ReconObj.NumIterations = val;
+end
+function SetMaxEig(ReconObj,val)    
+    ReconObj.MaxEig = val;
+end
 function SetDisplayRxProfs(ReconObj,val)    
     ReconObj.DispStatObj.SetDisplayRxProfs(val);
 end
 function SetDisplayOffResMap(ReconObj,val)    
     ReconObj.DispStatObj.SetDisplayOffResMap(val);
 end
-
+function SetDisplayInitialImages(ReconObj,val)    
+    ReconObj.DispStatObj.SetDisplayInitialImages(val);
+end
+function SetDisplayIterations(ReconObj,val)    
+    ReconObj.DispStatObj.SetDisplayIterations(val);
+end
+function SetDisplayIterationStep(ReconObj,val)    
+    ReconObj.DispStatObj.SetDisplayIterationStep(val);
+end
+function SetSaveIterationStep(ReconObj,val)    
+    ReconObj.DispStatObj.SaveIterationStep(val);
+end
 
 end
 end

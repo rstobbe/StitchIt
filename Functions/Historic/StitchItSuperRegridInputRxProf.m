@@ -31,7 +31,6 @@ classdef StitchItSuperRegridInputRxProf < handle
 % Setup
 %==================================================================   
         function Initialize(obj,AcqInfo,RxChannels) 
-            DisplayStatusCompass('Initialize',3);
             obj.AcqInfo = AcqInfo;
             obj.KernHolder.Initialize(AcqInfo,obj);
             obj.RxChannels = RxChannels;
@@ -70,7 +69,6 @@ classdef StitchItSuperRegridInputRxProf < handle
 % CreateImage
 %==================================================================         
         function Image = CreateImage(obj,Data,RxProfs)
-            DisplayStatusCompass('Create Image',3);
             if obj.BeneficiallyOrderDataForGpu
                 sz = size(Data);
                 if length(sz) == 2
@@ -103,7 +101,8 @@ classdef StitchItSuperRegridInputRxProf < handle
 %             OffResTimeArr = obj.AcqInfo.OffResTimeArr;
 %             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs,OffResMap,OffResTimeArr);
 %             Image = Nufft.Inverse(Data);
-%--------------------------------------------------------  
+%--------------------------------------------------------
+            clear Nufft
         end
 
 %==================================================================
