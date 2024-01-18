@@ -18,12 +18,9 @@ classdef StitchItWaveletOffResV1a < handle
         NumIterations = 50
         MaxEig
         Lambda
-        ItNum
         Nufft
-        DisplayResult = 0
-        DisplayIterationStep = 1
-        SaveIterationStep = 0
-        SaveIterationPath = ''
+        DispStatObj
+        DoMemRegister = 1
     end
     
     methods 
@@ -38,10 +35,11 @@ classdef StitchItWaveletOffResV1a < handle
 %==================================================================
 % Setup
 %==================================================================   
-        function Initialize(obj,AcqInfo,RxChannels) 
+        function Initialize(obj,AcqInfo,RxChannels,DispStatObj) 
             obj.AcqInfo = AcqInfo;
             obj.KernHolder.Initialize(AcqInfo,obj);
             obj.RxChannels = RxChannels;
+            obj.DispStatObj = DispStatObj;
             GpuTot = gpuDeviceCount;
             if isempty(obj.Gpus2Use)
                 if obj.RxChannels == 1
@@ -50,6 +48,9 @@ classdef StitchItWaveletOffResV1a < handle
                     obj.Gpus2Use = GpuTot;
                 end
             end
+%             %-----
+%             obj.Gpus2Use = GpuTot - 1;            % wavelet stuff on own
+%             %-----
             if obj.Gpus2Use > GpuTot
                 error('More Gpus than available have been specified');
             end
@@ -67,6 +68,7 @@ classdef StitchItWaveletOffResV1a < handle
             ReconInfoMat(4,:,:) = 1;                            % set sampling density compensation to '1'. 
             obj.AcqInfo.SetReconInfoMat(ReconInfoMat); 
             obj.Nufft = NufftOffResIterate();
+            obj.Nufft.SetDoMemRegister(obj.DoMemRegister);
             sz = size(OffResMap);
 %---------------------
             OtherGpuMemNeeded = sz(1)^3 * 8 * 16;               % wavelet holders + temp
@@ -78,14 +80,11 @@ classdef StitchItWaveletOffResV1a < handle
             Opt = [];
             Opt.maxEig = obj.MaxEig;
             Opt.resThresh = 1e-9;               % go by iterations
-            obj.ItNum = 1;
+            obj.DispStatObj.ResetIterationCount;
             %--
-            %[Image,resSqAll,RxAll,mseAll] = bfista(Func,Data,Wave,obj.Lambda,Image0,obj.NumIterations,Opt);
-            Image = bfista_rws(Func,Data,Wave,obj.Lambda,Image0,obj.NumIterations,Opt,obj);
-            %Image = bfista(Func,Data,Wave,obj.Lambda,Image0,obj.NumIterations,Opt);
+            Image = BfistaRwsV1a(Func,Data,Wave,obj.Lambda,Image0,obj.NumIterations,Opt,obj);
             %--
             clear Nufft
-            DisplayClearStatusCompass();
         end
 
 %==================================================================
@@ -97,25 +96,23 @@ classdef StitchItWaveletOffResV1a < handle
                     Out = obj.Nufft.Forward(In);
                 case 'transp'
                     Out = obj.Nufft.Inverse(In); 
-                    obj.DisplayCount;
             end   
         end           
-
-%==================================================================
-% DisplayCount
-%==================================================================           
-        function DisplayCount(obj) 
-            DisplayStatusCompass(['Compressed Sensing ' num2str(obj.ItNum)],3); 
-            obj.ItNum = obj.ItNum + 1;
-        end        
-        
+      
 %==================================================================
 % SetStitchSupportingPath
 %==================================================================         
         function SetStitchSupportingPath(obj,val)
             obj.StitchSupportingPath = val;
-        end             
-
+        end  
+        
+%==================================================================
+% SetDoMemRegister
+%==================================================================           
+        function SetDoMemRegister(obj,val)
+            obj.DoMemRegister = val;
+        end
+        
 %==================================================================
 % SetAcqInfo
 %==================================================================         
@@ -170,50 +167,8 @@ classdef StitchItWaveletOffResV1a < handle
 %==================================================================         
         function SetLambda(obj,val)
             obj.Lambda = val;
-        end             
-        
-%==================================================================
-% SetFov2ReturnBaseMatrix
-%==================================================================         
-        function SetFov2ReturnBaseMatrix(obj)
-            obj.Fov2Return = 'BaseMatrix';
-        end          
+        end                                     
 
-%==================================================================
-% SetFov2ReturnGridMatrix
-%==================================================================         
-        function SetFov2ReturnGridMatrix(obj)
-            obj.Fov2Return = 'GridMatrix';
-        end          
-
-%==================================================================
-% SetDisplayResultOn
-%==================================================================         
-        function SetDisplayResultOn(obj)
-            obj.DisplayResult = 1;
-        end         
-
-%==================================================================
-% SetDisplayIterationStep
-%==================================================================         
-        function SetDisplayIterationStep(obj,val)
-            obj.DisplayIterationStep = val;
-        end           
-
-%==================================================================
-% SetSaveIterationStep
-%==================================================================         
-        function SetSaveIterationStep(obj)
-            obj.SaveIterationStep = 1;
-        end          
-
-%==================================================================
-% SetSaveIterationPath
-%==================================================================         
-        function SetSaveIterationPath(obj,val)
-            obj.SaveIterationPath = val;
-        end           
-        
 %==================================================================
 % TestFov2ReturnGridMatrix
 %==================================================================         
@@ -222,19 +177,7 @@ classdef StitchItWaveletOffResV1a < handle
             if strcmp(obj.Fov2Return,'GridMatrix')
                 bool = 1;
             end
-        end            
-
-%==================================================================
-% IterationAnalysis
-%==================================================================            
-        function IterationAnalysis(obj,Image,nit) 
-            if obj.DisplayResult
-                if rem(nit,obj.DisplayIterationStep) == 0
-                    totgblnum = ImportImageCompass(Image,['CsIt',num2str(nit)],obj.SaveIterationStep,obj.SaveIterationPath);
-                    Gbl2ImageOrtho('IM3',totgblnum);
-                end
-            end
-        end
+        end 
 
 end
 end

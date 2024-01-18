@@ -24,6 +24,7 @@ classdef NufftIterate < handle
         NumRunsInverse
         NumRunsForward
         SimulationScale = 0
+        DoMemRegister = 1
     end
     
     methods 
@@ -40,6 +41,13 @@ classdef NufftIterate < handle
 %==================================================================           
         function SetSimulationScale(obj)
             obj.SimulationScale = 1;
+        end
+        
+%==================================================================
+% SetDoMemRegister
+%==================================================================           
+        function SetDoMemRegister(obj,val)
+            obj.DoMemRegister = val;
         end
 
 %==================================================================
@@ -106,12 +114,16 @@ classdef NufftIterate < handle
 %================================================================== 
         function Image = Inverse(obj,Data)
             if obj.RxChannels > 1
-                obj.NufftFuncs.RegisterHostComplexMemCuda(Data);
-                obj.DataMemPinBool = 1;
+                if obj.DoMemRegister
+                    obj.NufftFuncs.RegisterHostComplexMemCuda(Data);
+                    obj.DataMemPinBool = 1;
+                end
             end
             if obj.NumRunsInverse == 0 
                 obj.ImageMemPin = complex(zeros([obj.BaseMatrix obj.BaseMatrix obj.BaseMatrix,obj.ReconRxBatches*obj.NumGpuUsed],'single'),0);
-                obj.NufftFuncs.RegisterHostComplexMemCuda(obj.ImageMemPin);
+                if obj.DoMemRegister
+                    obj.NufftFuncs.RegisterHostComplexMemCuda(obj.ImageMemPin);
+                end
             end
             obj.NumRunsInverse = obj.NumRunsInverse+1;
             for q = 1:obj.ReconRxBatches 
@@ -197,19 +209,27 @@ classdef NufftIterate < handle
             Image = sum(obj.ImageMemPin,4);
             Scale = 1/obj.NufftFuncs.ConvScaleVal * single(obj.NufftFuncs.BaseImageMatrixMemDims(1)).^1.5 / single(obj.NufftFuncs.GridImageMatrixMemDims(1))^3;
             Image = Image*Scale;
-            obj.NufftFuncs.UnRegisterHostMemCuda(Data);
+            if obj.DoMemRegister
+                if obj.DataMemPinBool
+                    obj.NufftFuncs.UnRegisterHostMemCuda(Data);
+                end
+            end
         end           
 
 %==================================================================
 % Forward
 %==================================================================         
         function Data = Forward(obj,Image)
-            obj.NufftFuncs.RegisterHostComplexMemCuda(Image);
+            if obj.DoMemRegister
+                obj.NufftFuncs.RegisterHostComplexMemCuda(Image);
+            end
             if obj.NumRunsForward == 0
                 obj.DataMemPin = complex(zeros([obj.NufftFuncs.SampDatMemDims obj.RxChannels],'single'),0);
-                if obj.RxChannels > 1
-                    obj.NufftFuncs.RegisterHostComplexMemCuda(obj.DataMemPin);
-                    obj.DataMemPinBool = 1;
+                if obj.DoMemRegister
+                    if obj.RxChannels > 1
+                        obj.NufftFuncs.RegisterHostComplexMemCuda(obj.DataMemPin);
+                        obj.DataMemPinBool = 1;
+                    end
                 end
             end
             obj.NumRunsForward = obj.NumRunsForward+1;
@@ -294,7 +314,9 @@ classdef NufftIterate < handle
                 Scale = single(1/(obj.NufftFuncs.ConvScaleVal * obj.NufftFuncs.SubSamp.^3 * double(obj.NufftFuncs.BaseImageMatrixMemDims(1)).^1.5));
             end
             Data = obj.DataMemPin*Scale;
-            obj.NufftFuncs.UnRegisterHostMemCuda(Image);
+            if obj.DoMemRegister
+                obj.NufftFuncs.UnRegisterHostMemCuda(Image);
+            end
 %             obj.NufftFuncs.CudaDeviceWait(1);
 %             obj.TestTime = [obj.TestTime toc];
 %             TestTotalTime = sum(obj.TestTime)
@@ -304,13 +326,15 @@ classdef NufftIterate < handle
 % Destructor
 %================================================================== 
         function delete(obj)
-            if not(isempty(obj.DataMemPin))
-                if obj.DataMemPinBool
-                    obj.NufftFuncs.UnRegisterHostMemCuda(obj.DataMemPin);
+            if obj.DoMemRegister
+                if not(isempty(obj.DataMemPin))
+                    if obj.DataMemPinBool
+                        obj.NufftFuncs.UnRegisterHostMemCuda(obj.DataMemPin);
+                    end
                 end
-            end
-            if not(isempty(obj.ImageMemPin))
-                obj.NufftFuncs.UnRegisterHostMemCuda(obj.ImageMemPin);
+                if not(isempty(obj.ImageMemPin))
+                    obj.NufftFuncs.UnRegisterHostMemCuda(obj.ImageMemPin);
+                end
             end
             obj.NufftFuncs.FreeGpuMem;
         end        

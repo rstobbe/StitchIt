@@ -70,6 +70,11 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     if ReconObj.UseExternalShift
         Data = DataObj0.ReturnDataSetWithExternalShift(ReconObj.AcqInfoRxp,[],ReconObj.Shift);
     else
+%         %--
+%           Set0 = 58*(0:103);
+%           Set = Set0*(1:58).';
+%         ReconObj.AcqInfoRxp.SetTrajsInSet(1:2:ReconObj.AcqInfoRxp.NumTraj*2);
+%         %--
         Data = DataObj0.ReturnDataSetWithShift(ReconObj.AcqInfoRxp,[]);
     end
     ReconObj.DispStatObj.Status('Initialize',3);
@@ -102,7 +107,7 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     ReconObj.DispStatObj.Status('Nufft Recon',2);
     ReconObj.DispStatObj.Status('Initialize',3);
     if ReconObj.OffResCorrection
-        StitchIt = StitchNufftOffResV1a();
+        StitchIt = StitchItNufftOffResV1a();
     else
         StitchIt = StitchItNufftV1a(); 
     end
@@ -116,6 +121,9 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
         if ReconObj.UseExternalShift
             Data = DataObjArr{n}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
         else
+%             %--
+%             ReconObj.AcqInfo{ReconObj.ReconNumber}.SetTrajsInSet(1:2:ReconObj.AcqInfo{ReconObj.ReconNumber}.NumTraj*2);
+%             %--
             Data = DataObjArr{n}.DataObj.ReturnDataSetWithShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber);
         end
         Data = DataObjArr{n}.DataObj.ScaleData(StitchIt,Data);

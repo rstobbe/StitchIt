@@ -7,11 +7,13 @@ classdef DisplayStatusObject < handle
     properties (SetAccess = private)                                     
         DataObj
         Compass = 0
+        DisplaySensitivityMaps = 0
+        DisplayCombinedImages = 0
         DisplayRxProfs = 0
         DisplayOffResMap = 0
         DisplayInitialImages = 0
         DisplayIterations = 0
-        DisplayIterationStep
+        DisplayIterationStep = 1
         SaveIterationStep = 0
         PrevStringLen = 0
         SaveIterationPath
@@ -58,6 +60,32 @@ classdef DisplayStatusObject < handle
             back = repmat('\b',1,obj.PrevStringLen);
             fprintf(back);
             disp('');
+        end        
+
+%==================================================================
+% TestDisplaySensitivityMaps
+%==================================================================         
+        function TestDisplaySensitivityMaps(obj,SensMaps)  
+            if ~obj.Compass
+                return
+            end
+            if obj.DisplaySensitivityMaps
+                totgblnum = ImportImageCompass(SensMaps,'SensMaps');
+                Gbl2ImageOrtho('IM3',totgblnum);
+            end
+        end         
+
+%==================================================================
+% TestDisplayCombinedImages
+%==================================================================         
+        function TestDisplayCombinedImages(obj,CombImage)  
+            if ~obj.Compass
+                return
+            end
+            if obj.DisplayCombinedImages
+                totgblnum = ImportImageCompass(CombImage,'CombImage');
+                Gbl2ImageOrtho('IM3',totgblnum);
+            end
         end        
         
 %==================================================================
@@ -145,7 +173,13 @@ classdef DisplayStatusObject < handle
                 obj.SaveIterationPath = [obj.DataObj.DataPath,obj.DataObj.DataName,'\'];
             end
         end
-        function SetDisplayRxProfs(obj,val)    
+        function SetDisplaySensitivityMaps(obj,val)    
+            obj.DisplaySensitivityMaps = val;
+        end
+        function SetDisplayCombinedImages(obj,val)    
+            obj.DisplayCombinedImages = val;
+        end        
+        function SetDisplayRxProfs(obj,val)
             obj.DisplayRxProfs = val;
         end
         function SetDisplayOffResMap(obj,val)    

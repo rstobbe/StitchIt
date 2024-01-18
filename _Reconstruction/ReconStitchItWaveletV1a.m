@@ -22,6 +22,7 @@ properties (SetAccess = private)
     OffResCorrection = 1
     ResetGpus = 1
     DispStatObj
+    DoMemRegister = 1
 end
 
 methods 
@@ -106,7 +107,7 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     ReconObj.DispStatObj.Status('Initial Images',2);
     ReconObj.DispStatObj.Status('Initialize',3);
     if ReconObj.OffResCorrection
-        StitchIt = StitchNufftOffResV1a();
+        StitchIt = StitchItNufftOffResV1a();
     else
         StitchIt = StitchItNufftV1a(); 
     end
@@ -140,6 +141,7 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     else
         StitchIt = StitchItWaveletV1a();
     end
+    StitchIt.SetDoMemRegister(ReconObj.DoMemRegister);
     StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
     StitchIt.SetLevelsPerDim(ReconObj.LevelsPerDim);
     StitchIt.SetNumIterations(ReconObj.NumIterations);
@@ -150,7 +152,7 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     Image = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,length(DataObjArr)],'like',RxProfs);
     for n = 1:length(DataObjArr)
         if ReconObj.ResetGpus
-            ReconObj.DispStatObj.Status('Reset GPUs',2);            % Would be nice to fix the memory leak
+            ReconObj.DispStatObj.Status('Reset GPUs',3);            % Would be nice to fix the memory leak
             for m = 1:gpuDeviceCount
                 gpuDevice(m);
             end
@@ -183,6 +185,9 @@ end
 %% Set
 function SetBaseMatrix(ReconObj,val)    
     ReconObj.BaseMatrix = val;
+end
+function SetDoMemRegister(ReconObj,val)    
+    ReconObj.DoMemRegister = val;
 end
 function SetAcqInfo(ReconObj,val)    
     ReconObj.AcqInfo = val;
@@ -240,7 +245,7 @@ function SetDisplayIterationStep(ReconObj,val)
     ReconObj.DispStatObj.SetDisplayIterationStep(val);
 end
 function SetSaveIterationStep(ReconObj,val)    
-    ReconObj.DispStatObj.SaveIterationStep(val);
+    ReconObj.DispStatObj.SetSaveIterationStep(val);
 end
 
 end

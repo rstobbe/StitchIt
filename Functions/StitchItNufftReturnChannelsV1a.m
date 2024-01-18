@@ -3,7 +3,7 @@
 %   
 %================================================================
 
-classdef StitchItWaveletV1a < handle
+classdef StitchItNufftReturnChannelsV1a < handle
 
     properties (SetAccess = private)                                     
         StitchSupportingPath
@@ -14,13 +14,8 @@ classdef StitchItWaveletV1a < handle
         Gpus2Use
         RxChannels
         Fov2Return = 'BaseMatrix'
-        LevelsPerDim = [1 1 1]
-        NumIterations = 50
-        MaxEig
-        Lambda
-        Nufft
-        DispStatObj
-        DoMemRegister = 1
+        BeneficiallyOrderDataForGpu = 1
+        DataDims
     end
     
     methods 
@@ -28,18 +23,17 @@ classdef StitchItWaveletV1a < handle
 %==================================================================
 % Constructor
 %==================================================================   
-        function [obj] = StitchItWaveletV1a()
+        function [obj] = StitchItNufftReturnChannelsV1a()
             obj.KernHolder = NufftKernelHolder();
         end       
 
 %==================================================================
 % Setup
 %==================================================================   
-        function Initialize(obj,AcqInfo,RxChannels,DispStatObj) 
+        function Initialize(obj,AcqInfo,RxChannels) 
             obj.AcqInfo = AcqInfo;
             obj.KernHolder.Initialize(AcqInfo,obj);
             obj.RxChannels = RxChannels;
-            obj.DispStatObj = DispStatObj;
             GpuTot = gpuDeviceCount;
             if isempty(obj.Gpus2Use)
                 if obj.RxChannels == 1
@@ -48,71 +42,56 @@ classdef StitchItWaveletV1a < handle
                     obj.Gpus2Use = GpuTot;
                 end
             end
-%             %-----
-%             obj.Gpus2Use = GpuTot - 1;            % wavelet stuff on own
-%             %-----
             if obj.Gpus2Use > GpuTot
                 error('More Gpus than available have been specified');
             end
-            sz = size(AcqInfo.ReconInfoMat);
-            if ~strcmp(AcqInfo.DataDims,'Pt2Pt') || sz(1)~=4
-                error('YB_ file not specified properly - probably old version');
+            if isempty(AcqInfo.DataDims)
+                obj.DataDims = 'Traj2Traj';
+            else
+            	obj.DataDims = AcqInfo.DataDims;
+            end
+            if isempty(AcqInfo.DataOrder)
+                obj.BeneficiallyOrderDataForGpu = 0;
+            end
+            if obj.BeneficiallyOrderDataForGpu
+                if not(AcqInfo.Reordered)
+                    sz = size(AcqInfo.ReconInfoMat);
+                    ReconInfoMatArr = reshape(AcqInfo.ReconInfoMat,sz(1)*sz(2),4);
+                    ReconInfoMatArr = ReconInfoMatArr(AcqInfo.DataOrder,:);
+                    ReconInfoMat = reshape(ReconInfoMatArr,sz(1),sz(2),4);
+                    AcqInfo.SetReconInfoMat(ReconInfoMat);
+                    AcqInfo.SetReordered;
+                end
             end
         end    
         
 %==================================================================
 % CreateImage
 %==================================================================         
-        function Image = CreateImage(obj,Data,RxProfs,Image0)                  
-            ReconInfoMat = obj.AcqInfo.ReconInfoMat;
-            ReconInfoMat(4,:,:) = 1;                            % set sampling density compensation to '1'. 
-            obj.AcqInfo.SetReconInfoMat(ReconInfoMat); 
-            obj.Nufft = NufftIterate();
-            obj.Nufft.SetDoMemRegister(obj.DoMemRegister);
-            sz = size(Image0);
-%---------------------
-            OtherGpuMemNeeded = sz(1)^3 * 8 * 16;               % wavelet holders + temp
-            obj.Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs,OtherGpuMemNeeded);
-%---------------------
-            isDec = 0;                                          % Non-decimated to avoid blocky edges
-            Wave = dwt(obj.LevelsPerDim,size(Image0),isDec);  
-            Func = @(x,transp) obj.IterateFunc(x,transp);
-            Opt = [];
-            Opt.maxEig = obj.MaxEig;
-            Opt.resThresh = 1e-9;               % go by iterations
-            obj.DispStatObj.ResetIterationCount;
-            %--
-            Image = BfistaRwsV1a(Func,Data,Wave,obj.Lambda,Image0,obj.NumIterations,Opt,obj);
-            %--
-            clear Nufft
+        function Image = CreateImage(obj,Data)
+            if obj.BeneficiallyOrderDataForGpu
+                sz = size(Data);
+                if length(sz) == 2
+                    sz(3) = 1;
+                end
+                if obj.BeneficiallyOrderDataForGpu
+                    DataArr = reshape(Data,sz(1)*sz(2),sz(3));
+                    DataArrReorder = DataArr(obj.AcqInfo.DataOrder,:);
+                    Data = reshape(DataArrReorder,sz(1),sz(2),sz(3));
+                end
+            end
+            Nufft = NufftReturnChannels();
+            Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
+            Image = Nufft.Inverse(obj,Data);
         end
 
-%==================================================================
-% IterateFunc
-%==================================================================           
-        function Out = IterateFunc(obj,In,Transp)
-            switch Transp
-                case 'notransp'
-                    Out = obj.Nufft.Forward(In);
-                case 'transp'
-                    Out = obj.Nufft.Inverse(In); 
-            end   
-        end           
-      
 %==================================================================
 % SetStitchSupportingPath
 %==================================================================         
         function SetStitchSupportingPath(obj,val)
             obj.StitchSupportingPath = val;
-        end  
-        
-%==================================================================
-% SetDoMemRegister
-%==================================================================           
-        function SetDoMemRegister(obj,val)
-            obj.DoMemRegister = val;
-        end
-        
+        end             
+
 %==================================================================
 % SetAcqInfo
 %==================================================================         
@@ -140,34 +119,20 @@ classdef StitchItWaveletV1a < handle
         function SetBaseMatrix(obj,val)
             obj.BaseMatrix = val;
         end           
-
+                
 %==================================================================
-% SetLevelsPerDim
-%==================================================================   
-        function SetLevelsPerDim(obj,val)
-            obj.LevelsPerDim = val;
-        end         
-
-%==================================================================
-% SetMaxEig
-%==================================================================   
-        function SetMaxEig(obj,val)
-            obj.MaxEig = val;
+% SetFov2ReturnBaseMatrix
+%==================================================================         
+        function SetFov2ReturnBaseMatrix(obj)
+            obj.Fov2Return = 'BaseMatrix';
         end          
-        
-%==================================================================
-% SetNumIterations
-%==================================================================         
-        function SetNumIterations(obj,val)
-            obj.NumIterations = val;
-        end        
 
 %==================================================================
-% SetLambda
+% SetFov2ReturnGridMatrix
 %==================================================================         
-        function SetLambda(obj,val)
-            obj.Lambda = val;
-        end                                     
+        function SetFov2ReturnGridMatrix(obj)
+            obj.Fov2Return = 'GridMatrix';
+        end          
 
 %==================================================================
 % TestFov2ReturnGridMatrix
@@ -177,8 +142,11 @@ classdef StitchItWaveletV1a < handle
             if strcmp(obj.Fov2Return,'GridMatrix')
                 bool = 1;
             end
-        end 
+        end            
+                     
 
+        
+    end
 end
-end
+
 
