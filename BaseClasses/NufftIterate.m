@@ -53,7 +53,7 @@ classdef NufftIterate < handle
 %==================================================================
 % Initialize
 %==================================================================   
-        function Initialize(obj,Stitch,KernHolder,AcqInfo,RxChannels,RxProfs,OtherGpuMemNeeded)
+        function Initialize(obj,Stitch,KernHolder,AcqInfo,RxChannels,OtherGpuMemNeeded)
 
             if nargin < 7
                 OtherGpuMemNeeded = 0;
@@ -94,21 +94,23 @@ classdef NufftIterate < handle
             %--------------------------------------
             % Nufft Initialize
             %--------------------------------------
-            obj.NufftFuncs.Initialize(obj,KernHolder,AcqInfo);
-
-            %--------------------------------------
-            % Load RxProfs
-            %--------------------------------------   
+            obj.NufftFuncs.Initialize(obj,KernHolder,AcqInfo); 
             obj.NufftFuncs.AllocateRcvrProfMatricesGpuMem;   
+            obj.NumRunsInverse = 0;
+            obj.NumRunsForward = 0;               
+        end      
+
+%==================================================================
+% LoadRxProfs
+%==================================================================        
+        function LoadRxProfs(obj,RxProfs)
             if obj.ReconRxBatches == 1
                 obj.NufftFuncs.LoadRcvrProfMatricesGpuMum(RxProfs);
             else
                 obj.RxProfs = RxProfs;
             end 
-            obj.NumRunsInverse = 0;
-            obj.NumRunsForward = 0;               
-        end      
-
+        end
+        
 %==================================================================
 % Inverse
 %================================================================== 

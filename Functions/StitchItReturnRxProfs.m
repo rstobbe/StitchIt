@@ -16,6 +16,7 @@ classdef StitchItReturnRxProfs < handle
         Fov2Return = 'BaseMatrix'
         BeneficiallyOrderDataForGpu = 1
         DataDims
+        Nufft
     end
     
     methods 
@@ -63,6 +64,8 @@ classdef StitchItReturnRxProfs < handle
                     AcqInfo.SetReordered;
                 end
             end
+            obj.Nufft = NufftReturnChannels();
+            obj.Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
         end    
         
 %==================================================================
@@ -85,19 +88,9 @@ classdef StitchItReturnRxProfs < handle
                     Data = reshape(DataArrReorder,sz(1),sz(2),sz(3));
                 end
             end
-            Nufft = NufftReturnChannels();
-            Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
-            LowResImages = Nufft.Inverse(obj,Data);
+            LowResImages = obj.Nufft.Inverse(obj,Data);
             LowResSos = sum(abs(LowResImages).^2,4);
-            %----
-            %LowResSos(LowResSos < 0.01) = 0.01;                % no good - don't do
-            %----
             RxProfs = LowResImages./sqrt(LowResSos);
-            %----
-            %Mask = LowResSos < 0.05;                           % no good - don't do
-            %MaskMat = repmat(Mask,1,1,1,obj.RxChannels);
-            %RxProfs(MaskMat) = 1;
-            %----
         end
 
 %==================================================================

@@ -65,7 +65,7 @@ classdef NufftFunctions < NufftGpu
             obj.AllocateReconInfoGpuMem(ReconInfoSize);                       
             SampDatSize = [AcqInfo.NumTraj AcqInfo.NumCol];
             obj.AllocateSampDatGpuMem(SampDatSize);
-            
+                        
             %--------------------------------------
             % Load
             %-------------------------------------- 
@@ -76,13 +76,16 @@ classdef NufftFunctions < NufftGpu
             %--------------------------------------
             % FftInitialize
             %--------------------------------------             
-            obj.SetupFourierTransform;       
+            obj.SetupFourierTransform; 
         end
         
 %==================================================================
 % FreeGpuMem
 %==================================================================           
         function FreeGpuMem(obj) 
+            if not(isempty(obj.HFourierTransformPlan))
+                obj.ReleaseFourierTransform;
+            end
             if not(isempty(obj.HKspaceMatrix))
                 obj.FreeKspaceMatricesGpuMem;
             end
@@ -109,9 +112,6 @@ classdef NufftFunctions < NufftGpu
             end
             if not(isempty(obj.HInvFilt))
                 obj.FreeInvFiltGpuMem;
-            end
-            if not(isempty(obj.HFourierTransformPlan))
-                obj.ReleaseFourierTransform;
             end
         end   
 

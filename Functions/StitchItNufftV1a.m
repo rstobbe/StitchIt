@@ -16,6 +16,7 @@ classdef StitchItNufftV1a < handle
         Fov2Return = 'BaseMatrix'
         BeneficiallyOrderDataForGpu = 1
         DataDims
+        Nufft
     end
     
     methods 
@@ -63,6 +64,8 @@ classdef StitchItNufftV1a < handle
                     AcqInfo.SetReordered;
                 end
             end
+            obj.Nufft = NufftReturnChannels();
+            obj.Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
         end    
         
 %==================================================================
@@ -81,9 +84,7 @@ classdef StitchItNufftV1a < handle
                 end
             end
 %-------------------------------------------------------- 
-            Nufft = NufftReturnChannels();
-            Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
-            Images = Nufft.Inverse(obj,Data);
+            Images = obj.Nufft.Inverse(obj,Data);
             Image = sum(Images.*conj(RxProfs),4);
 %-------------------------------------------------------- 
 %--------------------------------------------------------           
@@ -102,7 +103,6 @@ classdef StitchItNufftV1a < handle
 %             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs,OffResMap,OffResTimeArr);
 %             Image = Nufft.Inverse(Data);
 %--------------------------------------------------------
-            clear Nufft
         end
 
 %==================================================================

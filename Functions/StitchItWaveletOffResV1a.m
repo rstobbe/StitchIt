@@ -71,11 +71,16 @@ classdef StitchItWaveletOffResV1a < handle
             obj.Nufft.SetDoMemRegister(obj.DoMemRegister);
             sz = size(OffResMap);
 %---------------------
-            OtherGpuMemNeeded = sz(1)^3 * 8 * 16;               % wavelet holders + temp
+            %OtherGpuMemNeeded = sz(1)^3 * 8 * 16;               % wavelet holders + temp
+            OtherGpuMemNeeded = 0;                               % wavelet not in gpu
             obj.Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs,OffResMap,OffResTimeArr,OtherGpuMemNeeded);
 %---------------------
             isDec = 0;                                          % Non-decimated to avoid blocky edges
-            Wave = dwt(obj.LevelsPerDim,size(Image0),isDec);  
+            family = 'db1';
+%---------------------            
+            useGPUFlag = 0;
+%---------------------
+            Wave = dwt(obj.LevelsPerDim,size(Image0),isDec,family,useGPUFlag);  
             Func = @(x,transp) obj.IterateFunc(x,transp);
             Opt = [];
             Opt.maxEig = obj.MaxEig;

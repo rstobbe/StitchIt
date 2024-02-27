@@ -18,8 +18,10 @@ properties (SetAccess = private)
     NumIterations
     Lambda
     MaxEig
+    Image0
     UseExternalShift = 0
     OffResCorrection = 1
+    CreateInitialImage = 1
     ResetGpus = 1
     DispStatObj
     DoMemRegister = 1
@@ -104,34 +106,37 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     OffResTimeArr = ReconObj.AcqInfo{ReconObj.ReconNumber}.OffResTimeArr;
     
     %% Initial Images
-    ReconObj.DispStatObj.Status('Initial Images',2);
-    ReconObj.DispStatObj.Status('Initialize',3);
-    if ReconObj.OffResCorrection
-        StitchIt = StitchItNufftOffResV1a();
-    else
-        StitchIt = StitchItNufftV1a(); 
-    end
-    StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
-    StitchIt.SetFov2ReturnBaseMatrix;
-    StitchIt.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels); 
-    Image0 = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,length(DataObjArr)],'like',RxProfs);
-    for n = 1:length(DataObjArr)
-        ReconObj.DispStatObj.Status('Load Data',3);
-        if ReconObj.UseExternalShift
-            Data = DataObjArr{n}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
-        else
-            Data = DataObjArr{n}.DataObj.ReturnDataSetWithShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber);
-        end
-        Data = DataObjArr{n}.DataObj.ScaleData(StitchIt,Data);
-        ReconObj.DispStatObj.Status('Generate',3);
+    %ReconObj.CreateInitialImage = 1;
+    if ReconObj.CreateInitialImage
+        ReconObj.DispStatObj.Status('Initial Images',2);
+        ReconObj.DispStatObj.Status('Initialize',3);
         if ReconObj.OffResCorrection
-            Image0(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,OffResMapInt,OffResTimeArr);
+            StitchIt = StitchItNufftOffResV1a();
         else
-            Image0(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs);
+            StitchIt = StitchItNufftV1a(); 
         end
+        StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
+        StitchIt.SetFov2ReturnBaseMatrix;
+        StitchIt.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels); 
+        ReconObj.Image0 = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,length(DataObjArr)],'like',RxProfs);
+        for n = 1:length(DataObjArr)
+            ReconObj.DispStatObj.Status('Load Data',3);
+            if ReconObj.UseExternalShift
+                Data = DataObjArr{n}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
+            else
+                Data = DataObjArr{n}.DataObj.ReturnDataSetWithShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber);
+            end
+            Data = DataObjArr{n}.DataObj.ScaleData(StitchIt,Data);
+            ReconObj.DispStatObj.Status('Generate',3);
+            if ReconObj.OffResCorrection
+                ReconObj.Image0(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,OffResMapInt,OffResTimeArr);
+            else
+                ReconObj.Image0(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs);
+            end
+        end
+        clear StichIt
     end
-    ReconObj.DispStatObj.TestDisplayInitialImages(Image0);
-    clear StichIt
+    ReconObj.DispStatObj.TestDisplayInitialImages(ReconObj.Image0);
     
     %% Wavelet 
     ReconObj.DispStatObj.Status('StichItWavelet',2);    
@@ -158,7 +163,7 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
             end
         end 
         ReconObj.DispStatObj.Status('Load Data',3);
-        if length(DataObjArr) > 1
+        if length(DataObjArr) > 1 || ReconObj.CreateInitialImage == 0
             if ReconObj.UseExternalShift
                 Data = DataObjArr{n}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
             else
@@ -168,9 +173,9 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
         Data = DataObjArr{n}.DataObj.ScaleData(StitchIt,Data);
         ReconObj.DispStatObj.Status('Generate',3);
         if ReconObj.OffResCorrection
-            Image(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,OffResMapInt,OffResTimeArr,Image0(:,:,:,n));
+            Image(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,OffResMapInt,OffResTimeArr,ReconObj.Image0(:,:,:,n));
         else
-            Image(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,Image0(:,:,:,n));
+            Image(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,ReconObj.Image0(:,:,:,n));
         end
         AbsMaxEig(n) = abs(StitchIt.MaxEig);
     end
@@ -247,6 +252,11 @@ end
 function SetSaveIterationStep(ReconObj,val)    
     ReconObj.DispStatObj.SetSaveIterationStep(val);
 end
+function SetImage0(ReconObj,val) 
+    ReconObj.CreateInitialImage = 0;
+    ReconObj.Image0 = val;
+end
+
 
 end
 end

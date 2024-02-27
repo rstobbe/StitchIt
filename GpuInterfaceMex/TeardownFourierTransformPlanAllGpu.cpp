@@ -16,8 +16,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, mxArray *prhs[])
 // Input                        
 //-------------------------------------
 if (nrhs != 2) mexErrMsgTxt("Should have 2 inputs");
-mwSize *Gpus,*HFourierTransformPlan;
-Gpus = mxGetUint64s(prhs[0]);
+mwSize *GpuTot,*HFourierTransformPlan;
+GpuTot = mxGetUint64s(prhs[0]);
 HFourierTransformPlan = mxGetUint64s(prhs[1]);
 
 //-------------------------------------
@@ -34,9 +34,12 @@ strcpy(Error,"no error");
 // Fourier Transform              
 //-------------------------------------
 unsigned int *HTemp;
-HTemp = (unsigned int*)mxCalloc(1,sizeof(unsigned int));
-HTemp[0] = (unsigned int)HFourierTransformPlan[0];
-FFT3DTeardownAllGpu(Gpus,HTemp,Error);
+HTemp = (unsigned int*)mxCalloc(GpuTot[0],sizeof(unsigned int));
+for(int n=0;n<GpuTot[0];n++){
+    HTemp[n] = (unsigned int)HFourierTransformPlan[n];
+}
+
+FFT3DTeardownAllGpu(GpuTot,HTemp,Error);
 
 //-------------------------------------
 // Return                  

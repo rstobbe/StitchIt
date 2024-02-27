@@ -54,20 +54,20 @@ classdef SiemensStitchItDataObject < handle
         end  
 
 %==================================================================
-% ReturnAllData
-%================================================================== 
-        function Data = ReturnAllData(obj,AcqInfo)
+% ReturnFirstDataPointEachTraj
+%==================================================================         
+        function Data = ReturnFirstDataPointEachTraj(obj,AcqInfo)
             QDataMemPosArr = uint64(obj.DataMem.Pos(:) + obj.DataScanHeaderBytes);                                  
             QDataReadSize = obj.DataChannelHeaderBytes/8 + obj.DataDims.NCol;
             QDataStart = obj.DataChannelHeaderBytes/8 + AcqInfo.SampStart;
-            QDataCol = AcqInfo.NumCol;
+            QDataCol = 1;
             QDataCha = obj.DataDims.NCha;
             QDataBlockLength = length(obj.DataMem.Pos);
             QDataInfo = uint64([QDataReadSize QDataStart QDataCol QDataCha QDataBlockLength]);
             Data = 1000 * BuildComplexDataArray([obj.DataPath,obj.DataFile],QDataMemPosArr,QDataInfo);
-            Data = permute(Data,[2 1 3]);       % for now
-        end        
-
+            Data = squeeze(permute(Data,[2 1 3]));       % for now
+        end
+        
 %==================================================================
 % ReturnDataSetWithShift
 %================================================================== 
@@ -83,6 +83,20 @@ classdef SiemensStitchItDataObject < handle
         end
 
 %==================================================================
+% ReturnAllAveragedDataWithShift
+%================================================================== 
+        function Data = ReturnAllAveragedDataWithShift(obj,AcqInfo,ReconNumber) 
+            Data = obj.ReturnAllData(AcqInfo,ReconNumber); 
+            ReconInfoMat = AcqInfo.ReconInfoMat(1:3,:,:);
+            ScaledFovShift(1) = -obj.FovShift(2)/1000;
+            ScaledFovShift(2) = obj.FovShift(1)/1000;
+            ScaledFovShift(3) = -obj.FovShift(3)/1000;
+            PhaseShift = exp(-1i*2*pi*squeeze(pagemtimes(ScaledFovShift,ReconInfoMat)));
+            PhaseShiftMat = repmat(PhaseShift,obj.NumAverages,1,obj.RxChannels);
+            Data = Data.*PhaseShiftMat;
+        end        
+        
+%==================================================================
 % ReturnDataSetWithExternalShift
 %================================================================== 
         function Data = ReturnDataSetWithExternalShift(obj,AcqInfo,ReconNumber,ExtFovShift) 
@@ -95,6 +109,21 @@ classdef SiemensStitchItDataObject < handle
             PhaseShiftMat = repmat(PhaseShift,1,1,obj.RxChannels);
             Data = Data.*PhaseShiftMat;
         end        
+
+%==================================================================
+% ReturnAllData
+%================================================================== 
+        function Data = ReturnAllData(obj,AcqInfo,ReconNumber)
+            QDataMemPosArr = uint64(obj.DataMem.Pos(:) + obj.DataScanHeaderBytes);                                  
+            QDataReadSize = obj.DataChannelHeaderBytes/8 + obj.DataDims.NCol;
+            QDataStart = obj.DataChannelHeaderBytes/8 + AcqInfo.SampStart;
+            QDataCol = AcqInfo.NumCol;
+            QDataCha = obj.DataDims.NCha;
+            QDataBlockLength = length(obj.DataMem.Pos);
+            QDataInfo = uint64([QDataReadSize QDataStart QDataCol QDataCha QDataBlockLength]);
+            Data = 1000 * BuildComplexDataArray([obj.DataPath,obj.DataFile],QDataMemPosArr,QDataInfo);
+            Data = permute(Data,[2 1 3]);       % for now
+        end            
         
 %==================================================================
 % ReturnDataSet

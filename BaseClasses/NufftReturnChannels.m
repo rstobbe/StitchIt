@@ -17,7 +17,11 @@ classdef NufftReturnChannels < handle
         ReconRxBatchLen
         TestTime
         ImageMemPin
-        RegisterDataMemory = 1
+        DataMemPin
+        ImageMemPinBool = 0
+        DataMemPinBool = 0
+        DoMemRegister = 1
+        AvailableMemory
     end
     
     methods 
@@ -28,6 +32,13 @@ classdef NufftReturnChannels < handle
         function [obj] = NufftReturnChannels()
             obj.NufftFuncs = NufftFunctions();
         end                        
+
+%==================================================================
+% SetDoMemRegister
+%==================================================================           
+        function SetDoMemRegister(obj,val)
+            obj.DoMemRegister = val;
+        end        
         
 %==================================================================
 % Initialize
@@ -52,10 +63,10 @@ classdef NufftReturnChannels < handle
             %--------------------------------------             
             DataKspaceMemory = AcqInfo.NumTraj*AcqInfo.NumCol*16;
             TotalMemory = GridMemory + BaseImageMemory + DataKspaceMemory;
-            AvailableMemory = obj.NufftFuncs.GpuParams.AvailableMemory;
+            obj.AvailableMemory = obj.NufftFuncs.GpuParams.AvailableMemory;
             obj.ReconRxBatches = 1;
             obj.ChanPerGpu = ceil(obj.RxChannels/(obj.NumGpuUsed));
-            if TotalMemory*1.2 > AvailableMemory
+            if TotalMemory*1.2 > obj.AvailableMemory
                 error('Not enough space on graphics card');
             end
             obj.ReconRxBatchLen = obj.ChanPerGpu * obj.NumGpuUsed;              
@@ -70,23 +81,22 @@ classdef NufftReturnChannels < handle
 % Inverse
 %================================================================== 
         function Image = Inverse(obj,Stitch,Data)
-            if ndims(Data) == 2
-                obj.RegisterDataMemory = 0;
-            end
-            if obj.RegisterDataMemory
-                Error = RegisterHostComplexMemCuda61(Data);
-                if not(strcmp(Error,'no error'))
-                    error(Error);
+            if obj.RxChannels > 1
+                if obj.DoMemRegister
+                    obj.NufftFuncs.RegisterHostComplexMemCuda(Data);
+                    obj.DataMemPinBool = 1;
                 end
             end
-            if Stitch.TestFov2ReturnGridMatrix
-                obj.ImageMemPin = complex(zeros([Stitch.GridMatrix Stitch.GridMatrix Stitch.GridMatrix,obj.RxChannels],'single'),0);
-            else
-                obj.ImageMemPin = complex(zeros([Stitch.BaseMatrix Stitch.BaseMatrix Stitch.BaseMatrix,obj.RxChannels],'single'),0);
-            end
-            Error = RegisterHostComplexMemCuda61(obj.ImageMemPin);
-            if not(strcmp(Error,'no error'))
-                error(Error);
+            if obj.ImageMemPinBool == 0 
+                if Stitch.TestFov2ReturnGridMatrix
+                    obj.ImageMemPin = complex(zeros([Stitch.GridMatrix Stitch.GridMatrix Stitch.GridMatrix,obj.RxChannels],'single'),0);
+                else
+                    obj.ImageMemPin = complex(zeros([Stitch.BaseMatrix Stitch.BaseMatrix Stitch.BaseMatrix,obj.RxChannels],'single'),0);
+                end
+                if obj.DoMemRegister
+                    obj.NufftFuncs.RegisterHostComplexMemCuda(obj.ImageMemPin);
+                    obj.ImageMemPinBool = 1;
+                end
             end
             for q = 1:obj.ReconRxBatches 
                 for p = 1:obj.ChanPerGpu
@@ -190,10 +200,9 @@ classdef NufftReturnChannels < handle
             end
             Scale = 1/obj.NufftFuncs.ConvScaleVal * single(Stitch.BaseMatrix).^1.5 / single(Stitch.GridMatrix)^3;
             Image = obj.ImageMemPin*Scale;
-            if obj.RegisterDataMemory
-                Error = UnRegisterHostMemCuda61(Data);
-                if not(strcmp(Error,'no error'))
-                    error(Error);
+            if obj.DoMemRegister
+                if obj.DataMemPinBool
+                    obj.NufftFuncs.UnRegisterHostMemCuda(Data);
                 end
             end
         end           
@@ -202,10 +211,12 @@ classdef NufftReturnChannels < handle
 % Destructor
 %================================================================== 
         function delete(obj)
-            if not(isempty(obj.ImageMemPin))
-                Error = UnRegisterHostMemCuda61(obj.ImageMemPin);
-                if not(strcmp(Error,'no error'))
-                    error(Error);
+            if obj.DoMemRegister
+                if not(isempty(obj.DataMemPin))
+                    obj.NufftFuncs.UnRegisterHostMemCuda(obj.DataMemPin);
+                end
+                if not(isempty(obj.ImageMemPin))
+                    obj.NufftFuncs.UnRegisterHostMemCuda(obj.ImageMemPin);
                 end
             end
             obj.NufftFuncs.FreeGpuMem;

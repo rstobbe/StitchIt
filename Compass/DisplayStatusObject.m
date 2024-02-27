@@ -117,12 +117,16 @@ classdef DisplayStatusObject < handle
 %==================================================================
 % TestDisplayInitialImages
 %==================================================================         
-        function TestDisplayInitialImages(obj,Image0)  
+        function TestDisplayInitialImages(obj,Image0,Name)  
             if ~obj.Compass
                 return
             end
             if obj.DisplayInitialImages
-                totgblnum = ImportImageCompass(Image0,'Image0');
+                if isempty(Name)
+                    totgblnum = ImportImageCompass(Image0,'Image0');
+                else
+                    totgblnum = ImportImageCompass(Image0,Name);
+                end
                 Gbl2ImageOrtho('IM3',totgblnum);
             end
         end
