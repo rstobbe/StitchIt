@@ -2,8 +2,11 @@
 % CompassImageCompass
 %================================================================== 
 
-function totgblnum = ImportImageCompass(Image,Name,Save,Path)
+function totgblnum = ImportImageCompass(Image,Name,Save,Path,DispWid)
 
+    if nargin < 5
+        DispWid = [0 max(abs(Image(:)))];
+    end
     if nargin < 3
         Save = 0;
         Path = [];
@@ -33,7 +36,7 @@ function totgblnum = ImportImageCompass(Image,Name,Save,Path)
     % Set Up Compass Display
     %----------------------------------------------
     MSTRCT.type = 'abs';
-    MSTRCT.dispwid = [0 max(abs(IMG.Im(:)))];
+    MSTRCT.dispwid = DispWid;
     MSTRCT.ImInfo.pixdim = [1 1 1];
     MSTRCT.ImInfo.vox = 1;
     MSTRCT.ImInfo.info = [];

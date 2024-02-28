@@ -22,6 +22,7 @@ properties (SetAccess = private)
     DispStatObj
     DoMemRegister = 1
     RespPhaseImages2Do = 1
+    SaveFov = [400 400 300]; 
 end
 
 methods 
@@ -61,6 +62,7 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     end
 
     %% TrajMash
+    ReconObj.DispStatObj.Status('Calculate TrajMash',2);
     FirstDataPoints = DataObj0.ReturnFirstDataPointEachTraj(ReconObj.AcqInfo{ReconObj.ReconNumber});
     MetaData.NumTraj = ReconObj.AcqInfoRxp.NumTraj;
     MetaData.NumAverages = DataObj0.NumAverages;
@@ -113,7 +115,14 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     StitchIt.SetLambda(ReconObj.Lambda);
     StitchIt.SetMaxEig(ReconObj.MaxEig);        
     StitchIt.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels,ReconObj.DispStatObj); 
-    Image = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,NumImages],'like',single(1+1i));      
+    
+    Fov = ReconObj.AcqInfoRxp.Fov;
+    for n = 1:3
+        Sz(n) = 2*round(((ReconObj.SaveFov(n)/Fov)*ReconObj.BaseMatrix)/2);
+        Start(n) = (ReconObj.BaseMatrix - Sz(n))/2; 
+        Stop(n) = Start(n) + Sz(n) - 1;
+    end
+    Image = zeros([Sz(1),Sz(2),Sz(3),NumImages],'like',single(1+1i));      
     
     %% Loop Through
   
@@ -136,7 +145,8 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
         %%% StitchIt Recon
         ReconObj.DispStatObj.Status(['StitchIt Recon ',num2str(ReconObj.RespPhaseImages2Do(nim))],2);
         StitchIt.LoadRxProfs(RxProfs);
-        Image(:,:,:,nim) = StitchIt.CreateImage(Data,Image0);
+        ImageOut = StitchIt.CreateImage(Data,Image0);
+        Image(:,:,:,nim) = ImageOut(Start(1):Stop(1),Start(2):Stop(2),Start(3):Stop(3));
         
         %%% StitchIt Recon
         if nim == 1
@@ -211,6 +221,9 @@ function SetDoMemRegister(ReconObj,val)
 end
 function SetRespPhaseImages2Do(ReconObj,val)    
     ReconObj.RespPhaseImages2Do = val;
+end
+function SetSaveFov(ReconObj,val)    
+    ReconObj.SaveFov = val;
 end
 
 end

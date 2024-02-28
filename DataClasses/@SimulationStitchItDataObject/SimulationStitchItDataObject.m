@@ -2,7 +2,7 @@
 %  
 %================================================================
 
-classdef SimulationDataObject < handle
+classdef SimulationStitchItDataObject < handle
 
     properties (SetAccess = private)                    
         DataFile 
@@ -22,11 +22,11 @@ classdef SimulationDataObject < handle
 %==================================================================
 % Constructor
 %==================================================================   
-        function obj = SimulationDataObject(file)
+        function obj = SimulationStitchItDataObject(file)
             load(file);
             SAMP = saveData.SAMP;
-            if isprop(SAMP.KSMP,'Delay')
-                obj.FirstSampDelay = SAMP.KSMP.Delay;
+            if isprop(SAMP,'Delay')
+                obj.FirstSampDelay = SAMP.Delay;
             else
                 obj.FirstSampDelay = 0;
             end
@@ -71,7 +71,7 @@ classdef SimulationDataObject < handle
             obj.DataName = SAMP.name;
             
             obj.DataInfo.ExpPars = '';
-            obj.DataInfo.ExpDisp = '';
+            obj.DataInfo.ExpDisp = SAMP.ExpDisp;
             obj.DataInfo.PanelOutput = SAMP.PanelOutput;
             obj.DataInfo.Seq = 'Simulation';
             obj.DataInfo.Protocol = SAMP.name;
@@ -87,17 +87,17 @@ classdef SimulationDataObject < handle
         end
         
 %==================================================================
-% Initialize
+% Initialize  (do scaling somewhere else)
 %==================================================================   
-        function Initialize(obj,Options)
-            Scale = (Options.GridMatrix/obj.DataInfo.SimSampGridMatrix)^3;
-            for n = 1:length(obj.DataFull)
-                obj.DataFull{n} = obj.DataFull{n}*Scale;
-            end
-            if isprop(Options,'IntensityScale')
-                Options.SetIntensityScale(1);
-            end
-        end
+%         function Initialize(obj,Options)
+%             Scale = (Options.GridMatrix/obj.DataInfo.SimSampGridMatrix)^3;
+%             for n = 1:length(obj.DataFull)
+%                 obj.DataFull{n} = obj.DataFull{n}*Scale;
+%             end
+%             if isprop(Options,'IntensityScale')
+%                 Options.SetIntensityScale(1);
+%             end
+%         end
 
 %==================================================================
 % ScaleData
