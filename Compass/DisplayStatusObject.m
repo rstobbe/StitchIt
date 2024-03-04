@@ -57,9 +57,11 @@ classdef DisplayStatusObject < handle
                 Status2('done','',2);
                 Status2('done','',3);
             end
-            back = repmat('\b',1,obj.PrevStringLen);
-            fprintf(back);
-            disp('');
+%             back = repmat('\b',1,obj.PrevStringLen);
+%             fprintf(back);
+%             disp('');
+            clc
+            obj.PrevStringLen = 0;
         end        
 
 %==================================================================
@@ -173,8 +175,10 @@ classdef DisplayStatusObject < handle
         function SetDataObj(obj,val)
             obj.DataObj = val;
             if obj.SaveIterationStep
-                mkdir([obj.DataObj.DataPath,obj.DataObj.DataName,'\']);
-                obj.SaveIterationPath = [obj.DataObj.DataPath,obj.DataObj.DataName,'\'];
+                if not(exist([obj.DataObj.DataPath,obj.DataObj.DataName,'\'],'dir'))
+                    mkdir([obj.DataObj.DataPath,obj.DataObj.DataName,'\']);
+                    obj.SaveIterationPath = [obj.DataObj.DataPath,obj.DataObj.DataName,'\'];
+                end
             end
         end
         function SetDisplaySensitivityMaps(obj,val)    

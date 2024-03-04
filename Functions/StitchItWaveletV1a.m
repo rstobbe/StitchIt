@@ -19,7 +19,7 @@ classdef StitchItWaveletV1a < handle
         Lambda
         Nufft
         DispStatObj
-        DoMemRegister = 1
+        UnallocateRamOnFinish
         ReconInfoMatHold
         AcqInfo
         Wave
@@ -71,7 +71,7 @@ classdef StitchItWaveletV1a < handle
             % Initialize Nufft
             %---------------------------------------------
             obj.Nufft = NufftIterate();
-            obj.Nufft.SetDoMemRegister(obj.DoMemRegister);
+            obj.Nufft.SetDoMemRegister(~obj.UnallocateRamOnFinish);
             OtherGpuMemNeeded = 0;                               % wavelet not in gpu
             obj.Nufft.Initialize(obj,obj.KernHolder,AcqInfo,obj.RxChannels,OtherGpuMemNeeded);
 
@@ -97,8 +97,15 @@ classdef StitchItWaveletV1a < handle
 %==================================================================         
         function LoadRxProfs(obj,RxProfs)                  
             obj.Nufft.LoadRxProfs(RxProfs);
-        end        
+        end
         
+%==================================================================
+% SetUnallocateRamOnFinish
+%==================================================================         
+        function SetUnallocateRamOnFinish(obj,val)                  
+            obj.UnallocateRamOnFinish = val;
+        end            
+
 %==================================================================
 % CreateImage
 %==================================================================         

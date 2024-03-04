@@ -15,6 +15,7 @@ classdef StitchItReturnRxProfs < handle
         RxChannels
         Fov2Return = 'BaseMatrix'
         BeneficiallyOrderDataForGpu = 1
+        UnallocateRamOnFinish = 0
         DataDims
         Nufft
     end
@@ -65,8 +66,16 @@ classdef StitchItReturnRxProfs < handle
                 end
             end
             obj.Nufft = NufftReturnChannels();
+            obj.Nufft.SetDoMemRegister(~obj.UnallocateRamOnFinish);
             obj.Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
         end    
+
+%==================================================================
+% SetUnallocateRamOnFinish
+%==================================================================         
+        function SetUnallocateRamOnFinish(obj,val)                  
+            obj.UnallocateRamOnFinish = val;
+        end              
         
 %==================================================================
 % CreateImage
@@ -98,8 +107,15 @@ classdef StitchItReturnRxProfs < handle
 %==================================================================         
         function SetStitchSupportingPath(obj,val)
             obj.StitchSupportingPath = val;
-        end             
-
+        end
+        
+%==================================================================
+% SetDoMemRegister
+%==================================================================           
+        function SetDoMemRegister(obj,val)
+            obj.DoMemRegister = val;
+        end        
+        
 %==================================================================
 % SetAcqInfo
 %==================================================================         

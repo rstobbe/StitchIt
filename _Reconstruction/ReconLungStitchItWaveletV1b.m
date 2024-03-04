@@ -20,9 +20,10 @@ properties (SetAccess = private)
     UseExternalShift = 0
     ResetGpus = 1
     DispStatObj
-    DoMemRegister = 1
     RespPhaseImages2Do = 1
-    SaveFov = [400 400 300]; 
+    LowRamCase = 0
+    LowGpuRamCase = 0
+    SaveFov = [400 400 400];    % Y-X-Z   (Has to be isotropic for now - need to decide how to save new Fov for display)
 end
 
 methods 
@@ -38,6 +39,10 @@ end
 % CreateImage
 %==================================================================  
 function [Image,err] = CreateImage(ReconObj,DataObjArr)     
+    %% Status Display
+    ReconObj.DispStatObj.StatusClear();
+    ReconObj.DispStatObj.Status('ReconLungStitchItWavelet',1);
+    
     %% Test  
     DataObj0 = DataObjArr{1}.DataObj;
     ReconObj.DispStatObj.SetDataObj(DataObj0);
@@ -62,7 +67,7 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     end
 
     %% TrajMash
-    ReconObj.DispStatObj.Status('Calculate TrajMash',2);
+    ReconObj.DispStatObj.Status('Solve TrajMash',2);
     FirstDataPoints = DataObj0.ReturnFirstDataPointEachTraj(ReconObj.AcqInfo{ReconObj.ReconNumber});
     MetaData.NumTraj = ReconObj.AcqInfoRxp.NumTraj;
     MetaData.NumAverages = DataObj0.NumAverages;
@@ -91,31 +96,33 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
         end
     end    
 
-    %% RxProf Setup
-    ReconObj.DispStatObj.Status('RxProf Initialize',2);
-    StitchItRx = StitchItReturnRxProfs();
-    StitchItRx.SetBaseMatrix(ReconObj.BaseMatrix);
-    StitchItRx.SetFov2ReturnBaseMatrix;
-    StitchItRx.Initialize(ReconObj.AcqInfoRxp,DataObj0.RxChannels);      
+    %% Setup
+    if ~ReconObj.LowGpuRamCase
+        % RxProf Setup
+        ReconObj.DispStatObj.Status('RxProf Initialize',2);
+        StitchItRx = StitchItReturnRxProfs();
+        StitchItRx.SetUnallocateRamOnFinish(ReconObj.LowRamCase);                                             
+        StitchItRx.SetBaseMatrix(ReconObj.BaseMatrix);
+        StitchItRx.Initialize(ReconObj.AcqInfoRxp,DataObj0.RxChannels);      
 
-    %% Initial Image Setup
-    ReconObj.DispStatObj.Status('Initial Image Initialize',2);
-    StitchItInit = StitchItNufftV1a(); 
-    StitchItInit.SetBaseMatrix(ReconObj.BaseMatrix);
-    StitchItInit.SetFov2ReturnBaseMatrix;
-    StitchItInit.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels);     
-    
-    %% StitchIt Setup
-    ReconObj.DispStatObj.Status('StitchIt Recon Initialize',2);
-    StitchIt = StitchItWaveletV1a();  
-    StitchIt.SetDoMemRegister(ReconObj.DoMemRegister);
-    StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
-    StitchIt.SetLevelsPerDim(ReconObj.LevelsPerDim);
-    StitchIt.SetNumIterations(ReconObj.NumIterations);
-    StitchIt.SetLambda(ReconObj.Lambda);
-    StitchIt.SetMaxEig(ReconObj.MaxEig);        
-    StitchIt.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels,ReconObj.DispStatObj); 
-    
+        % StitchItNufft Setup
+        ReconObj.DispStatObj.Status('Initial Image Initialize',2);
+        StitchItInit = StitchItNufftV1a(); 
+        StitchItInit.SetUnallocateRamOnFinish(ReconObj.LowRamCase); 
+        StitchItInit.SetBaseMatrix(ReconObj.BaseMatrix);
+        StitchItInit.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels); 
+        
+        % StitchItWavelet Setup
+        ReconObj.DispStatObj.Status('StitchIt Recon Initialize',2);
+        StitchIt = StitchItWaveletV1a();  
+        StitchIt.SetUnallocateRamOnFinish(ReconObj.LowRamCase); 
+        StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
+        StitchIt.SetLevelsPerDim(ReconObj.LevelsPerDim);
+        StitchIt.SetNumIterations(ReconObj.NumIterations);
+        StitchIt.SetLambda(ReconObj.Lambda);
+        StitchIt.SetMaxEig(ReconObj.MaxEig);        
+        StitchIt.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels,ReconObj.DispStatObj);         
+    end             
     Fov = ReconObj.AcqInfoRxp.Fov;
     for n = 1:3
         Sz(n) = 2*round(((ReconObj.SaveFov(n)/Fov)*ReconObj.BaseMatrix)/2);
@@ -125,40 +132,74 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     Image = zeros([Sz(1),Sz(2),Sz(3),NumImages],'like',single(1+1i));      
     
     %% Loop Through
-  
     for nim = 1:NumImages
         
-        %%% RxProfs
+        % RxProfs
+        if ReconObj.LowGpuRamCase
+            ReconObj.DispStatObj.Status('RxProf Initialize',2);
+            StitchItRx = StitchItReturnRxProfs();
+            StitchItRx.SetUnallocateRamOnFinish(ReconObj.LowRamCase);                                             
+            StitchItRx.SetBaseMatrix(ReconObj.BaseMatrix);
+            StitchItRx.Initialize(ReconObj.AcqInfoRxp,DataObj0.RxChannels);
+        end
         ReconObj.DispStatObj.Status(['RxProfs ',num2str(ReconObj.RespPhaseImages2Do(nim))],2);
         Data = DoTrajMash(DataRxProfFull,WeightArr(:,ReconObj.RespPhaseImages2Do(nim)),DataObj0.NumAverages);
         Data = DataObj0.ScaleData(StitchItRx,Data);
         RxProfs = StitchItRx.CreateImage(Data);
         ReconObj.DispStatObj.TestDisplayRxProfs(RxProfs);
+        if ReconObj.LowGpuRamCase
+            clear StitchItRx
+        end
 
-        %%% Initial Image
+        % Initial Image
+        if ReconObj.LowGpuRamCase
+            ReconObj.DispStatObj.Status('Nufft Recon Initialize',2);
+            StitchItInit = StitchItNufftV1a(); 
+            StitchItInit.SetUnallocateRamOnFinish(ReconObj.LowRamCase); 
+            StitchItInit.SetBaseMatrix(ReconObj.BaseMatrix);
+            StitchItInit.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels);
+        end
         ReconObj.DispStatObj.Status(['Initial Image ',num2str(ReconObj.RespPhaseImages2Do(nim))],2);
         Data = DoTrajMash(DataFull,WeightArr(:,ReconObj.RespPhaseImages2Do(nim)),DataObj0.NumAverages);
         Data = DataObj0.ScaleData(StitchItInit,Data);
-        Image0 = StitchItInit.CreateImage(Data,RxProfs);
-        ReconObj.DispStatObj.TestDisplayInitialImages(Image0);
+        StitchItInit.LoadRxProfs(RxProfs);
+        Image0 = StitchItInit.CreateImage(Data);
+        ReconObj.DispStatObj.TestDisplayInitialImages(Image0,['Image0Resp',num2str(ReconObj.RespPhaseImages2Do(nim))]);
+        if ReconObj.LowGpuRamCase
+            clear StitchItInit
+        end
         
-        %%% StitchIt Recon
+        % StitchIt Recon
+        if ReconObj.LowGpuRamCase
+            ReconObj.DispStatObj.Status('StitchIt Recon Initialize',2);
+            StitchIt = StitchItWaveletV1a();  
+            StitchIt.SetUnallocateRamOnFinish(ReconObj.LowRamCase); 
+            StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
+            StitchIt.SetLevelsPerDim(ReconObj.LevelsPerDim);
+            StitchIt.SetNumIterations(ReconObj.NumIterations);
+            StitchIt.SetLambda(ReconObj.Lambda);
+            StitchIt.SetMaxEig(ReconObj.MaxEig);        
+            StitchIt.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels,ReconObj.DispStatObj);
+        end
         ReconObj.DispStatObj.Status(['StitchIt Recon ',num2str(ReconObj.RespPhaseImages2Do(nim))],2);
         StitchIt.LoadRxProfs(RxProfs);
+        if ReconObj.LowRamCase
+            RxProfs = [];                           % unallocate this memory
+        end
         ImageOut = StitchIt.CreateImage(Data,Image0);
         Image(:,:,:,nim) = ImageOut(Start(1):Stop(1),Start(2):Stop(2),Start(3):Stop(3));
-        
-        %%% StitchIt Recon
         if nim == 1
             AbsMaxEig = abs(StitchIt.MaxEig); 
-            StitchIt.SetMaxEig(AbsMaxEig);
+            ReconObj.SetMaxEig(AbsMaxEig);
         end
-
+        if ReconObj.LowGpuRamCase
+            clear StitchIt
+        end
+       
     end
     clear StitchIt
     clear StitchItInit
     clear StitchItRx
-    ReconObj.SetMaxEig(AbsMaxEig);
     ReconObj.DispStatObj.StatusClear();
     
 end
@@ -216,8 +257,11 @@ end
 function SetSaveIterationStep(ReconObj,val)    
     ReconObj.DispStatObj.SetSaveIterationStep(val);
 end
-function SetDoMemRegister(ReconObj,val)    
-    ReconObj.DoMemRegister = val;
+function SetLowRamCase(ReconObj,val)    
+    ReconObj.LowRamCase = val;
+end
+function SetLowGpuRamCase(ReconObj,val)    
+    ReconObj.LowGpuRamCase = val;
 end
 function SetRespPhaseImages2Do(ReconObj,val)    
     ReconObj.RespPhaseImages2Do = val;

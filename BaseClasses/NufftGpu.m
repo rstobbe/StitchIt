@@ -293,9 +293,9 @@ classdef NufftGpu < handle
         end         
         
 %==================================================================
-% LoadRcvrProfMatricesGpuMum
+% LoadRcvrProfMatricesGpuMem
 %================================================================== 
-        function LoadRcvrProfMatricesGpuMum(obj,RcvrProfs)
+        function LoadRcvrProfMatricesGpuMem(obj,RcvrProfs)
             sz = size(RcvrProfs);
             if sum(sz(1:3)) ~= sum(obj.BaseImageMatrixMemDims)
                 error('RcvrProfs dimensionality problem');

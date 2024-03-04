@@ -17,7 +17,6 @@ classdef NufftReturnChannels < handle
         ReconRxBatchLen
         TestTime
         ImageMemPin
-        DataMemPin
         ImageMemPinBool = 0
         DataMemPinBool = 0
         DoMemRegister = 1
@@ -82,10 +81,8 @@ classdef NufftReturnChannels < handle
 %================================================================== 
         function Image = Inverse(obj,Stitch,Data)
             if obj.RxChannels > 1
-                if obj.DoMemRegister
-                    obj.NufftFuncs.RegisterHostComplexMemCuda(Data);
-                    obj.DataMemPinBool = 1;
-                end
+                obj.NufftFuncs.RegisterHostComplexMemCuda(Data);
+                obj.DataMemPinBool = 1;
             end
             if obj.ImageMemPinBool == 0 
                 if Stitch.TestFov2ReturnGridMatrix
@@ -200,10 +197,12 @@ classdef NufftReturnChannels < handle
             end
             Scale = 1/obj.NufftFuncs.ConvScaleVal * single(Stitch.BaseMatrix).^1.5 / single(Stitch.GridMatrix)^3;
             Image = obj.ImageMemPin*Scale;
-            if obj.DoMemRegister
-                if obj.DataMemPinBool
-                    obj.NufftFuncs.UnRegisterHostMemCuda(Data);
-                end
+            
+            if obj.DataMemPinBool
+                obj.NufftFuncs.UnRegisterHostMemCuda(Data);     % always unregister 'Data'
+            end
+            if ~obj.DoMemRegister
+                obj.ImageMemPin = [];                               % if no MemRegister, free up this memory space
             end
         end           
         
@@ -212,9 +211,6 @@ classdef NufftReturnChannels < handle
 %================================================================== 
         function delete(obj)
             if obj.DoMemRegister
-                if not(isempty(obj.DataMemPin))
-                    obj.NufftFuncs.UnRegisterHostMemCuda(obj.DataMemPin);
-                end
                 if not(isempty(obj.ImageMemPin))
                     obj.NufftFuncs.UnRegisterHostMemCuda(obj.ImageMemPin);
                 end

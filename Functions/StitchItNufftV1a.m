@@ -17,6 +17,7 @@ classdef StitchItNufftV1a < handle
         BeneficiallyOrderDataForGpu = 1
         DataDims
         Nufft
+        UnallocateRamOnFinish
     end
     
     methods 
@@ -29,7 +30,7 @@ classdef StitchItNufftV1a < handle
         end       
 
 %==================================================================
-% Setup
+% Initialize
 %==================================================================   
         function Initialize(obj,AcqInfo,RxChannels) 
             obj.AcqInfo = AcqInfo;
@@ -64,14 +65,45 @@ classdef StitchItNufftV1a < handle
                     AcqInfo.SetReordered;
                 end
             end
-            obj.Nufft = NufftReturnChannels();
+            if obj.TestFov2ReturnGridMatrix
+                error('Test only for ReturnBaseMatrix');
+            end
+            obj.Nufft = NufftIterate(); 
+            obj.Nufft.SetDoMemRegister(~obj.UnallocateRamOnFinish);
             obj.Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
+%-------------------------------------------------------- 
+% Old Testing
+%             obj.Nufft = NufftReturnChannels();                                        
+%             obj.Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
+%--------------------------------------------------------          
+% Old Testing
+%             Nufft = NufftOffResIterate();                             
+%             sz = size(RxProfs);
+%             OffResMap = zeros(sz(1:3),'single');
+%             OffResTimeArr = obj.AcqInfo.OffResTimeArr;
+%             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,OffResMap,OffResTimeArr);
+%             Image = Nufft.Inverse(Data);
+%--------------------------------------------------------
         end    
+
+%==================================================================
+% LoadRxProfs
+%==================================================================         
+        function LoadRxProfs(obj,RxProfs)                  
+            obj.Nufft.LoadRxProfs(RxProfs);
+        end          
+
+%==================================================================
+% SetUnallocateRamOnFinish
+%==================================================================         
+        function SetUnallocateRamOnFinish(obj,val)                  
+            obj.UnallocateRamOnFinish = val;
+        end          
         
 %==================================================================
 % CreateImage
 %==================================================================         
-        function Image = CreateImage(obj,Data,RxProfs)
+        function Image = CreateImage(obj,Data)
             if obj.BeneficiallyOrderDataForGpu
                 sz = size(Data);
                 if length(sz) == 2
@@ -83,26 +115,15 @@ classdef StitchItNufftV1a < handle
                     Data = reshape(DataArrReorder,sz(1),sz(2),sz(3));
                 end
             end
-%-------------------------------------------------------- 
-            Images = obj.Nufft.Inverse(obj,Data);
-            Image = sum(Images.*conj(RxProfs),4);
-%-------------------------------------------------------- 
-%--------------------------------------------------------           
-%             if obj.TestFov2ReturnGridMatrix
-%                 error('Test only for ReturnBaseMatrix');
-%             end
-%             Nufft = NufftIterate();                                   
-%             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs);
-%             Image = Nufft.Inverse(Data);
-%--------------------------------------------------------  
-%--------------------------------------------------------           
-%             Nufft = NufftOffResIterate();                             
-%             sz = size(RxProfs);
-%             OffResMap = zeros(sz(1:3),'single');
-%             OffResTimeArr = obj.AcqInfo.OffResTimeArr;
-%             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs,OffResMap,OffResTimeArr);
-%             Image = Nufft.Inverse(Data);
+            Image = obj.Nufft.Inverse(Data);
+            if obj.UnallocateRamOnFinish
+                obj.Nufft.UnallocateRamRxProfs;
+            end
 %--------------------------------------------------------
+% Old Testing
+%             Images = obj.Nufft.Inverse(obj,Data);
+%             Image = sum(Images.*conj(RxProfs),4);
+%--------------------------------------------------------           
         end
 
 %==================================================================
