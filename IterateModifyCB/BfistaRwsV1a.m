@@ -96,14 +96,23 @@ function [x, resSqAll, RxAll, mseAll] = BfistaRwsV1a(Ain,bin,Rin,lam,x0,NitMax,o
     nit = 1;
     t_prev = 1;
     x_prev = x0;
+    %------------------
+    clear x0
+    %------------------
     while ~finished
         % Find gradient for ||Ax-b||^2_2
         residual_y = A(y,'notransp')-bin;
         resSqAll(nit,2) = residual_y(:)'*residual_y(:);
         grad = 2*A(residual_y,'transp');
+        %------------------
+        clear residual_y
+        %------------------
         
         % Perform the step along the gradient (this is just simple gradient decent)
         g = y - stepSz*grad;
+        %------------------
+        clear grad
+        %------------------
         
         % Perform soft thresholding of the transform
         % See Beck et al., eq 2.6 for why lam is multiplied by stepSz. 
@@ -116,8 +125,14 @@ function [x, resSqAll, RxAll, mseAll] = BfistaRwsV1a(Ain,bin,Rin,lam,x0,NitMax,o
         %   Note that Rin'*Rin = I must be true for this case. This is
         %   true for both the decimated and undecimated wavelet tranform.
         x = Rin*g;
+        %------------------
+        clear g
+        %------------------
         tmp = abs(lam*x);
         RxAll(nit,2) = gather(sum(tmp(:)));
+        %------------------
+        clear tmp
+        %------------------
         x = softthresh(x,lam*stepSz); 
         x = Rin'*x;
         

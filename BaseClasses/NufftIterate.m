@@ -208,7 +208,7 @@ classdef NufftIterate < handle
                 end
                 for m = 1:obj.NumGpuUsed
                     GpuNum = m-1;
-                    ReturnNum = (q-1)*obj.ReconRxBatchLen + m;
+                    ReturnNum = (q-1)*obj.NumGpuUsed + m;
                     obj.NufftFuncs.ReturnBaseImageCidx(GpuNum,obj.ImageMemPin,ReturnNum);
                 end
             end
@@ -260,7 +260,7 @@ classdef NufftIterate < handle
                 end
                 Rcvrs = RbStart:RbStop;
                 if obj.ReconRxBatches ~= 1
-                    obj.NufftFuncs.LoadRcvrProfMatricesGpuMum(obj.RxProfs(:,:,:,Rcvrs));
+                    obj.NufftFuncs.LoadRcvrProfMatricesGpuMem(obj.RxProfs(:,:,:,Rcvrs));
                 end
                 for p = 1:obj.ChanPerGpu 
                     obj.NufftFuncs.InitializeGridMatricesGpuMem;
@@ -330,9 +330,9 @@ classdef NufftIterate < handle
             Data = obj.DataMemPin*Scale;
             
             if obj.DoMemRegister
-                obj.NufftFuncs.UnRegisterHostMemCuda(Image);             % always unregister 'Image'
+                obj.NufftFuncs.UnRegisterHostMemCuda(Image);             % always unregister 'Image' if registered
             end
-            if obj.DataMemPinBool
+            if ~obj.DataMemPinBool
                 obj.DataMemPin = [];                                     % if no MemRegister, free up this memory space         
             end
 %             obj.NufftFuncs.CudaDeviceWait(1);
