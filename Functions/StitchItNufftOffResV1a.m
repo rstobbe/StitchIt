@@ -6,16 +6,8 @@
 classdef StitchItNufftOffResV1a < handle
 
     properties (SetAccess = private)                                     
-        StitchSupportingPath
-        AcqInfo
-        KernHolder
-        GridMatrix
-        BaseMatrix
-        Gpus2Use
-        RxChannels
-        Fov2Return = 'BaseMatrix'
-        BeneficiallyOrderDataForGpu = 1
-        DataDims
+        Nufft
+        UnallocateRamOnFinish = 0
     end
     
     methods 
@@ -24,143 +16,48 @@ classdef StitchItNufftOffResV1a < handle
 % Constructor
 %==================================================================   
         function [obj] = StitchItNufftOffResV1a()
-            obj.KernHolder = NufftKernelHolder();
+            obj.Nufft = NufftOffResIterate(); 
         end       
 
 %==================================================================
-% Setup
+% Initialize
 %==================================================================   
-        function Initialize(obj,AcqInfo,RxChannels) 
-            obj.AcqInfo = AcqInfo;
-            obj.KernHolder.Initialize(AcqInfo,obj);
-            obj.RxChannels = RxChannels;
-            GpuTot = gpuDeviceCount;
-            if isempty(obj.Gpus2Use)
-                if obj.RxChannels == 1
-                    obj.Gpus2Use = 1;
-                else
-                    obj.Gpus2Use = GpuTot;
-                end
-            end
-            if obj.Gpus2Use > GpuTot
-                error('More Gpus than available have been specified');
-            end
-            if isempty(AcqInfo.DataDims)
-                obj.DataDims = 'Traj2Traj';
-            else
-            	obj.DataDims = AcqInfo.DataDims;
-            end
-            if isempty(AcqInfo.DataOrder)
-                obj.BeneficiallyOrderDataForGpu = 0;
-            end
-            if obj.BeneficiallyOrderDataForGpu
-                if not(AcqInfo.Reordered)
-                    sz = size(AcqInfo.ReconInfoMat);
-                    ReconInfoMatArr = reshape(AcqInfo.ReconInfoMat,sz(1)*sz(2),4);
-                    ReconInfoMatArr = ReconInfoMatArr(AcqInfo.DataOrder,:);
-                    ReconInfoMat = reshape(ReconInfoMatArr,sz(1),sz(2),4);
-                    AcqInfo.SetReconInfoMat(ReconInfoMat);
-                    AcqInfo.SetReordered;
-                end
-            end
+        function Initialize(obj,KernHolder,AcqInfo) 
+            obj.Nufft.SetDoMemRegister(~obj.UnallocateRamOnFinish);
+            obj.Nufft.Initialize(KernHolder,AcqInfo);
         end    
         
 %==================================================================
 % CreateImage
 %==================================================================         
-        function Image = CreateImage(obj,Data,RxProfs,OffResMap,OffResTimeArr)
-            if obj.BeneficiallyOrderDataForGpu
-                sz = size(Data);
-                if length(sz) == 2
-                    sz(3) = 1;
-                end
-                if obj.BeneficiallyOrderDataForGpu
-                    DataArr = reshape(Data,sz(1)*sz(2),sz(3));
-                    DataArrReorder = DataArr(obj.AcqInfo.DataOrder,:);
-                    Data = reshape(DataArrReorder,sz(1),sz(2),sz(3));
-                end
+        function Image = CreateImage(obj,Data)         
+            Image = obj.Nufft.Inverse(Data);
+            if obj.UnallocateRamOnFinish
+                obj.Nufft.UnallocateRamRxProfs;
             end
-%-------------------------------------------------------- 
-%             Nufft = NufftReturnChannels();
-%             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
-%             Images = Nufft.Inverse(obj,Data);
-%             Image = sum(Images.*conj(RxProfs),4);
-%-------------------------------------------------------- 
-%--------------------------------------------------------           
-%             if obj.TestFov2ReturnGridMatrix
-%                 error('Test only for ReturnBaseMatrix');
-%             end
-%             Nufft = NufftIterate();                                   
-%             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs);
-%             Image = Nufft.Inverse(Data);
-%--------------------------------------------------------  
-%--------------------------------------------------------           
-            Nufft = NufftOffResIterate();                             
-            Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs,OffResMap,OffResTimeArr);
-            Image = Nufft.Inverse(Data);
-%--------------------------------------------------------  
-        end
+        end                      
 
 %==================================================================
-% SetStitchSupportingPath
+% LoadRxProfs
 %==================================================================         
-        function SetStitchSupportingPath(obj,val)
-            obj.StitchSupportingPath = val;
-        end             
+        function LoadRxProfs(obj,RxProfs)                  
+            obj.Nufft.LoadRxProfs(RxProfs);
+        end          
 
 %==================================================================
-% SetAcqInfo
+% LoadOffResonance
 %==================================================================         
-        function SetAcqInfo(obj,val)
-            obj.AcqInfo = val;
-        end               
+        function LoadOffResonance(obj,OffResMap,OffResTimeArr)                  
+            obj.Nufft.LoadOffResonance(OffResMap,OffResTimeArr);
+        end         
         
 %==================================================================
-% SetGpus2Use
+% SetUnallocateRamOnFinish
 %==================================================================         
-        function SetGpus2Use(obj,val)
-            obj.Gpus2Use = val;
-        end
-        
-%==================================================================
-% SetGridMatrix
-%==================================================================   
-        function SetGridMatrix(obj,val)
-            obj.GridMatrix = val;
-        end              
-
-%==================================================================
-% SetBaseMatrix
-%==================================================================   
-        function SetBaseMatrix(obj,val)
-            obj.BaseMatrix = val;
-        end           
+        function SetUnallocateRamOnFinish(obj,val)                  
+            obj.UnallocateRamOnFinish = val;
+        end          
                 
-%==================================================================
-% SetFov2ReturnBaseMatrix
-%==================================================================         
-        function SetFov2ReturnBaseMatrix(obj)
-            obj.Fov2Return = 'BaseMatrix';
-        end          
-
-%==================================================================
-% SetFov2ReturnGridMatrix
-%==================================================================         
-        function SetFov2ReturnGridMatrix(obj)
-            obj.Fov2Return = 'GridMatrix';
-        end          
-
-%==================================================================
-% TestFov2ReturnGridMatrix
-%==================================================================         
-        function bool = TestFov2ReturnGridMatrix(obj)
-            bool = 0;
-            if strcmp(obj.Fov2Return,'GridMatrix')
-                bool = 1;
-            end
-        end            
-                     
-
         
     end
 end

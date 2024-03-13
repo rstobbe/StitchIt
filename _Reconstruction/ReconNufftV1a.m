@@ -1,6 +1,6 @@
 %==================================================================
 % (V1a)
-%   - If multi-image experiment, coil profile from first image
+%   - 
 %==================================================================
 
 classdef ReconNufftV1a < handle
@@ -18,6 +18,8 @@ properties (SetAccess = private)
     OffResCorrection = 0
     ResetGpus = 1
     DispStatObj
+    LowGpuRamCase = 0
+    IntensityCorrection = 1
 end
 
 methods 
@@ -33,6 +35,10 @@ end
 % CreateImage
 %==================================================================  
 function [Image,err] = CreateImage(ReconObj,DataObjArr)     
+    %% Status Display
+    ReconObj.DispStatObj.StatusClear();
+    ReconObj.DispStatObj.Status('ReconStitchItNufft',1);
+    
     %% Test  
     DataObj0 = DataObjArr{1}.DataObj;
     ReconObj.DispStatObj.SetDataObj(DataObj0);
@@ -63,6 +69,15 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
             gpuDevice(n);
         end
     end
+
+    %% NufftKernel
+    ReconObj.DispStatObj.Status('Load Nufft Kernel',2);
+    KernHolder = NufftKernelHolder();
+    if ReconObj.LowGpuRamCase
+        KernHolder.SetReducedSubSamp();           % probably not a big savings...
+    end
+    KernHolder.SetBaseMatrix(ReconObj.BaseMatrix);
+    KernHolder.Initialize(ReconObj.AcqInfoRxp,DataObj0.RxChannels);
     
     %% RxProfs
     ReconObj.DispStatObj.Status('RxProfs',2);
@@ -70,34 +85,52 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     if ReconObj.UseExternalShift
         Data = DataObj0.ReturnDataSetWithExternalShift(ReconObj.AcqInfoRxp,[],ReconObj.Shift);
     else
-%         %--
-%           Set0 = 58*(0:103);
-%           Set = Set0*(1:58).';
-%         ReconObj.AcqInfoRxp.SetTrajsInSet(1:2:ReconObj.AcqInfoRxp.NumTraj*2);
-%         %--
         Data = DataObj0.ReturnDataSetWithShift(ReconObj.AcqInfoRxp,[]);
     end
     ReconObj.DispStatObj.Status('Initialize',3);
     StitchIt = StitchItReturnRxProfs();
-    StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
-    StitchIt.SetFov2ReturnBaseMatrix;
-    StitchIt.Initialize(ReconObj.AcqInfoRxp,DataObj0.RxChannels); 
+    StitchIt.Initialize(KernHolder,ReconObj.AcqInfoRxp); 
     Data = DataObj0.ScaleData(StitchIt,Data);
     ReconObj.DispStatObj.Status('Generate',3);
     RxProfs = StitchIt.CreateImage(Data);
     ReconObj.DispStatObj.TestDisplayRxProfs(RxProfs);
-    clear SitchIt
+    clear('StitchIt','Data');
 
+    %% Intensity Correction
+    if ReconObj.IntensityCorrection
+        ReconObj.DispStatObj.Status('Intensity Correction',2);
+        ReconObj.DispStatObj.Status('Load Data',3);
+        if ReconObj.UseExternalShift
+            Data = DataObjArr{1}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
+        else
+            Data = DataObjArr{1}.DataObj.ReturnDataSetWithShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber);
+        end
+        ReconObj.DispStatObj.Status('Initialize',3);
+        StitchIt = StitchItNufftV1a();
+        StitchIt.Nufft.SetUseSdc(0);
+        StitchIt.Initialize(KernHolder,ReconObj.AcqInfo{ReconObj.ReconNumber});
+        StitchIt.LoadRxProfs(RxProfs);  
+        ReconObj.DispStatObj.Status('Generate',3);
+        IntenseCor = StitchIt.CreateImage(Data);
+        %totgblnum = ImportImageCompass(Image,'IntensCorTest');
+        %Gbl2ImageOrtho('IM3',totgblnum);
+        clear('StitchIt','Data');
+    end
+    
     %% Interpolate
     if ReconObj.OffResCorrection
-        ReconObj.DispStatObj.Status('Off Resonance Map',2);
-        ReconObj.DispStatObj.Status('Interpolate',3);
         sz = size(ReconObj.OffResMap);
-        OffResBaseMatrix = sz(1);
-        Array = linspace((OffResBaseMatrix/ReconObj.BaseMatrix)/2,OffResBaseMatrix-(OffResBaseMatrix/ReconObj.BaseMatrix)/2,ReconObj.BaseMatrix) + 0.5;
-        [X,Y,Z] = meshgrid(Array,Array,Array);
-        OffResMapInt = interp3(ReconObj.OffResMap,X,Y,Z,'maximak');
-        ReconObj.DispStatObj.TestDisplayOffResMap(OffResMapInt);
+        if sz(1) ~= ReconObj.BaseMatrix
+            ReconObj.DispStatObj.Status('Off Resonance Map',2);
+            ReconObj.DispStatObj.Status('Interpolate',3);
+            sz = size(ReconObj.OffResMap);
+            OffResBaseMatrix = sz(1);
+            Array = linspace((OffResBaseMatrix/ReconObj.BaseMatrix)/2,OffResBaseMatrix-(OffResBaseMatrix/ReconObj.BaseMatrix)/2,ReconObj.BaseMatrix) + 0.5;
+            [X,Y,Z] = meshgrid(Array,Array,Array);
+            ReconObj.OffResMap = interp3(ReconObj.OffResMap,X,Y,Z,'maximak');
+            clear('Array','X','Y','Z');
+        end
+        ReconObj.DispStatObj.TestDisplayOffResMap(ReconObj.OffResMap);
     end
     
     %% Sampling Timing
@@ -108,33 +141,36 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     ReconObj.DispStatObj.Status('Initialize',3);
     if ReconObj.OffResCorrection
         StitchIt = StitchItNufftOffResV1a();
+        StitchIt.Initialize(KernHolder,ReconObj.AcqInfo{ReconObj.ReconNumber});
+        StitchIt.LoadRxProfs(RxProfs);         
+        StitchIt.LoadOffResonance(ReconObj.OffResMap,OffResTimeArr);
+        clear('RxProfs','KernHolder','OffResTimeArr');
+        ReconObj.OffResMap = [];
     else
-        StitchIt = StitchItNufftV1a(); 
+        StitchIt = StitchItNufftV1a();
+        StitchIt.Initialize(KernHolder,ReconObj.AcqInfo{ReconObj.ReconNumber});
+        StitchIt.LoadRxProfs(RxProfs)
+        clear('RxProfs','KernHolder');
     end
-    StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
-    StitchIt.SetFov2ReturnBaseMatrix;
-    StitchIt.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels); 
-    Image = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,length(DataObjArr)],'like',RxProfs);
+    Image = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,length(DataObjArr)],'like',single(1+1i));
+    
     for n = 1:length(DataObjArr)
         ReconObj.DispStatObj.Status(['Nufft Recon ',num2str(n)],2);
         ReconObj.DispStatObj.Status('Load Data',3);
         if ReconObj.UseExternalShift
             Data = DataObjArr{n}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
         else
-%             %--
-%             ReconObj.AcqInfo{ReconObj.ReconNumber}.SetTrajsInSet(1:2:ReconObj.AcqInfo{ReconObj.ReconNumber}.NumTraj*2);
-%             %--
             Data = DataObjArr{n}.DataObj.ReturnDataSetWithShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber);
         end
         Data = DataObjArr{n}.DataObj.ScaleData(StitchIt,Data);
         ReconObj.DispStatObj.Status('Generate',3);
-        if ReconObj.OffResCorrection
-            Image(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,OffResMapInt,OffResTimeArr);
+        if ReconObj.IntensityCorrection
+            Image(:,:,:,n) = StitchIt.CreateImage(Data) .* abs(IntenseCor);
         else
-            Image(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs);
+            Image(:,:,:,n) = StitchIt.CreateImage(Data);
         end
     end
-    clear StichIt
+    clear('StitchIt');
     ReconObj.DispStatObj.StatusClear();
 
 end
@@ -180,7 +216,9 @@ end
 function SetDisplayOffResMap(ReconObj,val)    
     ReconObj.DispStatObj.SetDisplayOffResMap(val);
 end
-
+function SetLowGpuRamCase(ReconObj,val)    
+    ReconObj.LowGpuRamCase = val;
+end
 
 end
 end

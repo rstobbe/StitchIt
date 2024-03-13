@@ -6,21 +6,13 @@
 classdef StitchItWaveletOffResV1a < handle
 
     properties (SetAccess = private)                                     
-        StitchSupportingPath
-        AcqInfo
-        KernHolder
-        GridMatrix
-        BaseMatrix
-        Gpus2Use
-        RxChannels
-        Fov2Return = 'BaseMatrix'
         LevelsPerDim = [1 1 1]
         NumIterations = 50
         MaxEig
         Lambda
         Nufft
         DispStatObj
-        DoMemRegister = 1
+        UnallocateRamOnFinish = 0
     end
     
     methods 
@@ -29,67 +21,36 @@ classdef StitchItWaveletOffResV1a < handle
 % Constructor
 %==================================================================   
         function [obj] = StitchItWaveletOffResV1a()
-            obj.KernHolder = NufftKernelHolder();
+            obj.Nufft = NufftOffResIterate(); 
         end       
 
 %==================================================================
-% Setup
+% Initialize
 %==================================================================   
-        function Initialize(obj,AcqInfo,RxChannels,DispStatObj) 
-            obj.AcqInfo = AcqInfo;
-            obj.KernHolder.Initialize(AcqInfo,obj);
-            obj.RxChannels = RxChannels;
+        function Initialize(obj,KernHolder,AcqInfo,DispStatObj) 
             obj.DispStatObj = DispStatObj;
-            GpuTot = gpuDeviceCount;
-            if isempty(obj.Gpus2Use)
-                if obj.RxChannels == 1
-                    obj.Gpus2Use = 1;
-                else
-                    obj.Gpus2Use = GpuTot;
-                end
-            end
-%             %-----
-%             obj.Gpus2Use = GpuTot - 1;            % wavelet stuff on own
-%             %-----
-            if obj.Gpus2Use > GpuTot
-                error('More Gpus than available have been specified');
-            end
-            sz = size(AcqInfo.ReconInfoMat);
-            if ~strcmp(AcqInfo.DataDims,'Pt2Pt') || sz(1)~=4
-                error('YB_ file not specified properly - probably old version');
-            end
+            obj.Nufft.SetDoMemRegister(~obj.UnallocateRamOnFinish);
+            obj.Nufft.SetUseSdc(0);
+            obj.Nufft.Initialize(KernHolder,AcqInfo);
         end    
         
 %==================================================================
 % CreateImage
 %==================================================================         
-        function Image = CreateImage(obj,Data,RxProfs,OffResMap,OffResTimeArr,Image0)                  
-            ReconInfoMat = obj.AcqInfo.ReconInfoMat;
-            ReconInfoMat(4,:,:) = 1;                            % set sampling density compensation to '1'. 
-            obj.AcqInfo.SetReconInfoMat(ReconInfoMat); 
-            obj.Nufft = NufftOffResIterate();
-            obj.Nufft.SetDoMemRegister(obj.DoMemRegister);
-            sz = size(OffResMap);
-%---------------------
-            %OtherGpuMemNeeded = sz(1)^3 * 8 * 16;               % wavelet holders + temp
-            OtherGpuMemNeeded = 0;                               % wavelet not in gpu
-            obj.Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels,RxProfs,OffResMap,OffResTimeArr,OtherGpuMemNeeded);
-%---------------------
+        function Image = CreateImage(obj,Data,Image0)                  
             isDec = 0;                                          % Non-decimated to avoid blocky edges
-            family = 'db1';
-%---------------------            
+            family = 'db1';           
             useGPUFlag = 0;
-%---------------------
             Wave = dwt(obj.LevelsPerDim,size(Image0),isDec,family,useGPUFlag);  
             Func = @(x,transp) obj.IterateFunc(x,transp);
             Opt = [];
             Opt.maxEig = obj.MaxEig;
-            Opt.resThresh = 1e-9;               % go by iterations
+            Opt.resThresh = 1e-9;                           % go by iterations
             obj.DispStatObj.ResetIterationCount;
-            %--
             Image = BfistaRwsV1a(Func,Data,Wave,obj.Lambda,Image0,obj.NumIterations,Opt,obj);
-            %--
-            clear Nufft
+            if obj.UnallocateRamOnFinish
+                obj.Nufft.UnallocateRamRxProfs;
+            end
         end
 
 %==================================================================
@@ -102,50 +63,29 @@ classdef StitchItWaveletOffResV1a < handle
                 case 'transp'
                     Out = obj.Nufft.Inverse(In); 
             end   
-        end           
-      
-%==================================================================
-% SetStitchSupportingPath
-%==================================================================         
-        function SetStitchSupportingPath(obj,val)
-            obj.StitchSupportingPath = val;
-        end  
-        
-%==================================================================
-% SetDoMemRegister
-%==================================================================           
-        function SetDoMemRegister(obj,val)
-            obj.DoMemRegister = val;
         end
         
 %==================================================================
-% SetAcqInfo
+% LoadRxProfs
 %==================================================================         
-        function SetAcqInfo(obj,val)
-            obj.AcqInfo = val;
-        end               
-        
-%==================================================================
-% SetGpus2Use
-%==================================================================         
-        function SetGpus2Use(obj,val)
-            obj.Gpus2Use = val;
-        end
-        
-%==================================================================
-% SetGridMatrix
-%==================================================================   
-        function SetGridMatrix(obj,val)
-            obj.GridMatrix = val;
-        end              
+        function LoadRxProfs(obj,RxProfs)                  
+            obj.Nufft.LoadRxProfs(RxProfs);
+        end          
 
 %==================================================================
-% SetBaseMatrix
-%==================================================================   
-        function SetBaseMatrix(obj,val)
-            obj.BaseMatrix = val;
-        end           
-
+% LoadOffResonance
+%==================================================================         
+        function LoadOffResonance(obj,OffResMap,OffResTimeArr)                  
+            obj.Nufft.LoadOffResonance(OffResMap,OffResTimeArr);
+        end         
+        
+%==================================================================
+% SetUnallocateRamOnFinish
+%==================================================================         
+        function SetUnallocateRamOnFinish(obj,val)                  
+            obj.UnallocateRamOnFinish = val;
+        end          
+        
 %==================================================================
 % SetLevelsPerDim
 %==================================================================   
@@ -173,16 +113,6 @@ classdef StitchItWaveletOffResV1a < handle
         function SetLambda(obj,val)
             obj.Lambda = val;
         end                                     
-
-%==================================================================
-% TestFov2ReturnGridMatrix
-%==================================================================         
-        function bool = TestFov2ReturnGridMatrix(obj)
-            bool = 0;
-            if strcmp(obj.Fov2Return,'GridMatrix')
-                bool = 1;
-            end
-        end 
 
 end
 end

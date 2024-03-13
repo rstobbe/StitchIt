@@ -60,7 +60,7 @@ function [x, resSqAll, RxAll, mseAll] = BfistaRwsV1a(Ain,bin,Rin,lam,x0,NitMax,o
         rws.DispStatObj.Status('No MaxEig Specified - Finding',3);
 %         fprintf('bfista.m: finding maximum eigenvalue of A''A using power method...')
 %         tic1 = tic;
-        maxEig = powermethod(A,x0);
+        maxEig = PowerMethod(A,x0);
         rws.SetMaxEig(maxEig);    
 %         fprintf('took %d sec\n', round(toc(tic1)));
     end

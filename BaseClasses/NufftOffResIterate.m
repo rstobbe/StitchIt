@@ -24,10 +24,11 @@ classdef NufftOffResIterate < handle
         NumRunsInverse
         NumRunsForward
         SimulationScale = 0
+        DoMemRegister = 1
         OffResGridArr
         OffResGridBlockSize
         OffResLastGridBlockSize
-        DoMemRegister = 1
+        UseSdc = 1
     end
     
     methods 
@@ -37,8 +38,15 @@ classdef NufftOffResIterate < handle
 %==================================================================   
         function [obj] = NufftOffResIterate()
             obj.NufftFuncs = NufftOffResFunctions();
-        end                        
-
+        end
+        
+%==================================================================
+% SetUseSdc
+%==================================================================           
+        function SetUseSdc(obj,val)
+            obj.UseSdc = val;
+        end 
+        
 %==================================================================
 % SetSimulationScale
 %==================================================================           
@@ -56,17 +64,17 @@ classdef NufftOffResIterate < handle
 %==================================================================
 % Initialize
 %==================================================================   
-        function Initialize(obj,Stitch,KernHolder,AcqInfo,RxChannels,RxProfs,OffResMap,OffResTimeArr,OtherGpuMemNeeded)
+        function Initialize(obj,KernHolder,AcqInfo,OtherGpuMemNeeded)
             
-            if nargin < 9
+            if nargin < 4
                 OtherGpuMemNeeded = 0;
             end
             
-            obj.NumGpuUsed = Stitch.Gpus2Use;
-            obj.BaseMatrix = Stitch.BaseMatrix;
-            obj.GridMatrix = Stitch.GridMatrix;
-            obj.TempMatrix = Stitch.BaseMatrix;
-            obj.RxChannels = RxChannels;
+            obj.NumGpuUsed = KernHolder.Gpus2Use;
+            obj.BaseMatrix = KernHolder.BaseMatrix;
+            obj.GridMatrix = KernHolder.GridMatrix;
+            obj.TempMatrix = KernHolder.BaseMatrix;
+            obj.RxChannels = KernHolder.RxChannels;
             
             %--------------------------------------
             % Receive Batching
@@ -97,43 +105,61 @@ classdef NufftOffResIterate < handle
             %--------------------------------------
             % Nufft Initialize
             %--------------------------------------
-            obj.NufftFuncs.Initialize(obj,KernHolder,AcqInfo,OffResMap,OffResTimeArr);
-
+            obj.NufftFuncs.Initialize(obj,KernHolder,AcqInfo);
+            obj.NufftFuncs.AllocateRcvrProfMatricesGpuMem;   
+            obj.NumRunsInverse = 0;
+            obj.NumRunsForward = 0;  
+            
             %--------------------------------------
             % Off Resonance Stuff
             %--------------------------------------
             obj.OffResGridArr = AcqInfo.OffResGridArr;
             obj.OffResGridBlockSize = AcqInfo.OffResGridBlockSize;
             obj.OffResLastGridBlockSize = AcqInfo.OffResLastGridBlockSize;
-            
-            %--------------------------------------
-            % Load RxProfs
-            %--------------------------------------   
-            obj.NufftFuncs.AllocateRcvrProfMatricesGpuMem;   
-            if obj.ReconRxBatches == 1
-                obj.NufftFuncs.LoadRcvrProfMatricesGpuMum(RxProfs);
-            else
-                obj.RxProfs = RxProfs;
-            end 
-            obj.NumRunsInverse = 0;
-            obj.NumRunsForward = 0;               
         end      
 
+%==================================================================
+% LoadRxProfs
+%==================================================================        
+        function LoadRxProfs(obj,RxProfs)
+            if obj.ReconRxBatches == 1
+                obj.NufftFuncs.LoadRcvrProfMatricesGpuMem(RxProfs);
+            else
+                warning('Consider LowGpuMem Option if Available');
+                obj.RxProfs = RxProfs;
+            end 
+        end
+        
+%==================================================================
+% LoadOffResonance
+%==================================================================        
+        function LoadOffResonance(obj,OffResMap,OffResTimeArr)
+            obj.NufftFuncs.LoadOffResMapGpuMem(OffResMap);
+            obj.NufftFuncs.LoadOffResTimeArrGpuMem(OffResTimeArr);
+        end
+        
+%==================================================================
+% UnallocateRamRxProfs
+%==================================================================        
+        function UnallocateRamRxProfs(obj)
+            obj.RxProfs = [];
+        end           
+        
 %==================================================================
 % Inverse
 %================================================================== 
         function Image = Inverse(obj,Data)
             if obj.RxChannels > 1
-                if obj.DoMemRegister
-                    obj.NufftFuncs.RegisterHostComplexMemCuda(Data);
-                    obj.DataMemPinBool = 1;
-                end
+                obj.NufftFuncs.RegisterHostComplexMemCuda(Data);
+                obj.DataMemPinBool = 1;
             end
             if obj.NumRunsInverse == 0 
                 obj.ImageMemPin = complex(zeros([obj.BaseMatrix obj.BaseMatrix obj.BaseMatrix,obj.ReconRxBatches*obj.NumGpuUsed],'single'),0);
                 if obj.DoMemRegister
                     obj.NufftFuncs.RegisterHostComplexMemCuda(obj.ImageMemPin);
                 end
+            elseif ~obj.DoMemRegister
+                obj.ImageMemPin = complex(zeros([obj.BaseMatrix obj.BaseMatrix obj.BaseMatrix,obj.ReconRxBatches*obj.NumGpuUsed],'single'),0);
             end
             obj.NumRunsInverse = obj.NumRunsInverse+1;
             for q = 1:obj.ReconRxBatches 
@@ -144,7 +170,7 @@ classdef NufftOffResIterate < handle
                 end
                 Rcvrs = RbStart:RbStop;
                 if obj.ReconRxBatches ~= 1
-                    obj.NufftFuncs.LoadRcvrProfMatricesGpuMum(obj.RxProfs(:,:,:,Rcvrs));
+                    obj.NufftFuncs.LoadRcvrProfMatricesGpuMem(obj.RxProfs(:,:,:,Rcvrs));
                 end
                 obj.NufftFuncs.InitializeBaseHoldMatricesGpuMem;
                 for p = 1:obj.ChanPerGpu
@@ -234,10 +260,12 @@ classdef NufftOffResIterate < handle
             Image = sum(obj.ImageMemPin,4);
             Scale = 1/obj.NufftFuncs.ConvScaleVal * single(obj.NufftFuncs.BaseImageMatrixMemDims(1)).^1.5 / single(obj.NufftFuncs.GridImageMatrixMemDims(1))^3;
             Image = Image*Scale;
-            if obj.DoMemRegister
-                if obj.DataMemPinBool
-                    obj.NufftFuncs.UnRegisterHostMemCuda(Data);
-                end
+            
+            if obj.DataMemPinBool
+                obj.NufftFuncs.UnRegisterHostMemCuda(Data);         % always unregister 'Data'
+            end
+            if ~obj.DoMemRegister
+                obj.ImageMemPin = [];                               % if no MemRegister, free up this memory space
             end
         end           
 
@@ -256,6 +284,8 @@ classdef NufftOffResIterate < handle
                         obj.DataMemPinBool = 1;
                     end
                 end
+            elseif ~obj.DoMemRegister
+                obj.DataMemPin = complex(zeros([obj.NufftFuncs.SampDatMemDims obj.RxChannels],'single'),0);
             end
             obj.NumRunsForward = obj.NumRunsForward+1;
             obj.NufftFuncs.LoadBaseHoldImageMatrixGpuMem(Image);
@@ -271,7 +301,7 @@ classdef NufftOffResIterate < handle
                 end
                 Rcvrs = RbStart:RbStop;
                 if obj.ReconRxBatches ~= 1
-                    obj.NufftFuncs.LoadRcvrProfMatricesGpuMum(obj.RxProfs(:,:,:,Rcvrs));
+                    obj.NufftFuncs.LoadRcvrProfMatricesGpuMem(obj.RxProfs(:,:,:,Rcvrs));
                 end
                 obj.NufftFuncs.CudaDeviceWait(0);
                 for p = 1:obj.ChanPerGpu 
@@ -354,9 +384,16 @@ classdef NufftOffResIterate < handle
                 Scale = single(1/(obj.NufftFuncs.ConvScaleVal * obj.NufftFuncs.SubSamp.^3 * double(obj.NufftFuncs.BaseImageMatrixMemDims(1)).^1.5));
             end
             Data = obj.DataMemPin*Scale;
+
             if obj.DoMemRegister
-                obj.NufftFuncs.UnRegisterHostMemCuda(Image);
+                obj.NufftFuncs.UnRegisterHostMemCuda(Image);             % always unregister 'Image' if registered
             end
+            if ~obj.DataMemPinBool
+                obj.DataMemPin = [];                                     % if no MemRegister, free up this memory space         
+            end
+%             obj.NufftFuncs.CudaDeviceWait(1);
+%             obj.TestTime = [obj.TestTime toc];
+%             TestTotalTime = sum(obj.TestTime)
         end
         
 %==================================================================

@@ -24,7 +24,9 @@ properties (SetAccess = private)
     CreateInitialImage = 1
     ResetGpus = 1
     DispStatObj
-    DoMemRegister = 1
+    LowRamCase = 0
+    LowGpuRamCase = 0
+    IntensityCorrection = 1
 end
 
 methods 
@@ -40,7 +42,12 @@ end
 % CreateImage
 %==================================================================  
 function [Image,err] = CreateImage(ReconObj,DataObjArr)     
+    %% Status Display
+    ReconObj.DispStatObj.StatusClear();
+    ReconObj.DispStatObj.Status('ReconStitchItWavelet',1);
+    
     %% Test  
+    Image = [];
     DataObj0 = DataObjArr{1}.DataObj; 
     ReconObj.DispStatObj.SetDataObj(DataObj0);
     err.flag = 0;
@@ -62,7 +69,13 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
         err.msg = 'ReconNumber beyond length Recon_File';
         return
     end
-
+    Test = ReconObj.AcqInfo{1}.ReconInfoMat(4,1,1);
+    if Test == 1
+        err.flag = 1;
+        err.msg = 'Reload Recon_File';
+        return
+    end
+    
     %% Reset GPUs
     if ReconObj.ResetGpus
         ReconObj.DispStatObj.Status('Reset GPUs',2);
@@ -70,6 +83,15 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
             gpuDevice(n);
         end
     end
+
+    %% NufftKernel
+    ReconObj.DispStatObj.Status('Load Nufft Kernel',2);
+    KernHolder = NufftKernelHolder();
+    if ReconObj.LowGpuRamCase
+        KernHolder.SetReducedSubSamp();           % probably not a big savings...
+    end
+    KernHolder.SetBaseMatrix(ReconObj.BaseMatrix);
+    KernHolder.Initialize(ReconObj.AcqInfoRxp,DataObj0.RxChannels);
     
     %% RxProfs
     ReconObj.DispStatObj.Status('RxProfs',2);
@@ -81,45 +103,70 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     end
     ReconObj.DispStatObj.Status('Initialize',3);
     StitchIt = StitchItReturnRxProfs();
-    StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
-    StitchIt.SetFov2ReturnBaseMatrix;
-    StitchIt.Initialize(ReconObj.AcqInfoRxp,DataObj0.RxChannels); 
+    StitchIt.Initialize(KernHolder,ReconObj.AcqInfoRxp); 
     Data = DataObj0.ScaleData(StitchIt,Data);
     ReconObj.DispStatObj.Status('Generate',3);
     RxProfs = StitchIt.CreateImage(Data);
     ReconObj.DispStatObj.TestDisplayRxProfs(RxProfs);
-    clear SitchIt
+    clear('StitchIt','Data');
 
+    %% Intensity Correction
+    if ReconObj.IntensityCorrection
+        ReconObj.DispStatObj.Status('Intensity Correction',2);
+        ReconObj.DispStatObj.Status('Load Data',3);
+        if ReconObj.UseExternalShift
+            Data = DataObjArr{1}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
+        else
+            Data = DataObjArr{1}.DataObj.ReturnDataSetWithShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber);
+        end
+        ReconObj.DispStatObj.Status('Initialize',3);
+        StitchIt = StitchItNufftV1a();
+        StitchIt.Nufft.SetUseSdc(0);
+        StitchIt.Initialize(KernHolder,ReconObj.AcqInfo{ReconObj.ReconNumber});
+        StitchIt.LoadRxProfs(RxProfs);  
+        ReconObj.DispStatObj.Status('Generate',3);
+        IntenseCor = StitchIt.CreateImage(Data);
+        %totgblnum = ImportImageCompass(Image,'IntensCorTest');
+        %Gbl2ImageOrtho('IM3',totgblnum);
+        clear('StitchIt','Data');
+    end    
+    
     %% Interpolate
     if ReconObj.OffResCorrection
-        ReconObj.DispStatObj.Status('Off Resonance Map',2);
-        ReconObj.DispStatObj.Status('Interpolate',3);
         sz = size(ReconObj.OffResMap);
-        OffResBaseMatrix = sz(1);
-        Array = linspace((OffResBaseMatrix/ReconObj.BaseMatrix)/2,OffResBaseMatrix-(OffResBaseMatrix/ReconObj.BaseMatrix)/2,ReconObj.BaseMatrix) + 0.5;
-        [X,Y,Z] = meshgrid(Array,Array,Array);
-        OffResMapInt = interp3(ReconObj.OffResMap,X,Y,Z,'maximak');
-        ReconObj.DispStatObj.TestDisplayOffResMap(OffResMapInt);
+        if sz(1) ~= ReconObj.BaseMatrix
+            ReconObj.DispStatObj.Status('Off Resonance Map',2);
+            ReconObj.DispStatObj.Status('Interpolate',3);
+            sz = size(ReconObj.OffResMap);
+            OffResBaseMatrix = sz(1);
+            Array = linspace((OffResBaseMatrix/ReconObj.BaseMatrix)/2,OffResBaseMatrix-(OffResBaseMatrix/ReconObj.BaseMatrix)/2,ReconObj.BaseMatrix) + 0.5;
+            [X,Y,Z] = meshgrid(Array,Array,Array);
+            ReconObj.OffResMap = interp3(ReconObj.OffResMap,X,Y,Z,'maximak');
+            clear('Array','X','Y','Z');
+        end
+        ReconObj.DispStatObj.TestDisplayOffResMap(ReconObj.OffResMap);
     end
     
     %% Sampling Timing
     OffResTimeArr = ReconObj.AcqInfo{ReconObj.ReconNumber}.OffResTimeArr;
     
     %% Initial Images
-    %ReconObj.CreateInitialImage = 1;
     if ReconObj.CreateInitialImage
         ReconObj.DispStatObj.Status('Initial Images',2);
         ReconObj.DispStatObj.Status('Initialize',3);
         if ReconObj.OffResCorrection
             StitchIt = StitchItNufftOffResV1a();
+            StitchIt.Initialize(KernHolder,ReconObj.AcqInfo{ReconObj.ReconNumber});
+            StitchIt.LoadRxProfs(RxProfs);         
+            StitchIt.LoadOffResonance(ReconObj.OffResMap,OffResTimeArr);
         else
-            StitchIt = StitchItNufftV1a(); 
+            StitchIt = StitchItNufftV1a();
+            StitchIt.Initialize(KernHolder,ReconObj.AcqInfo{ReconObj.ReconNumber});
+            StitchIt.LoadRxProfs(RxProfs);
         end
-        StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
-        StitchIt.SetFov2ReturnBaseMatrix;
-        StitchIt.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels); 
-        ReconObj.Image0 = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,length(DataObjArr)],'like',RxProfs);
+        ReconObj.Image0 = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,length(DataObjArr)],'like',single(1+1i));
         for n = 1:length(DataObjArr)
+            ReconObj.DispStatObj.Status(['Nufft Recon ',num2str(n)],2);
             ReconObj.DispStatObj.Status('Load Data',3);
             if ReconObj.UseExternalShift
                 Data = DataObjArr{n}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
@@ -128,40 +175,35 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
             end
             Data = DataObjArr{n}.DataObj.ScaleData(StitchIt,Data);
             ReconObj.DispStatObj.Status('Generate',3);
-            if ReconObj.OffResCorrection
-                ReconObj.Image0(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,OffResMapInt,OffResTimeArr);
-            else
-                ReconObj.Image0(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs);
-            end
+            ReconObj.Image0(:,:,:,n) = StitchIt.CreateImage(Data);
         end
-        clear StichIt
+        clear('StitchIt');
     end
-    ReconObj.DispStatObj.TestDisplayInitialImages(ReconObj.Image0);
+    ReconObj.DispStatObj.TestDisplayInitialImages(ReconObj.Image0,'Image0');
     
     %% Wavelet 
     ReconObj.DispStatObj.Status('StichItWavelet',2);    
     ReconObj.DispStatObj.Status('Initialize',3);
     if ReconObj.OffResCorrection
-        StitchIt = StitchItWaveletOffResV1a(); 
+        StitchIt = StitchItWaveletOffResV1a();
+        StitchIt.Initialize(KernHolder,ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.DispStatObj);
+        StitchIt.LoadRxProfs(RxProfs);         
+        StitchIt.LoadOffResonance(ReconObj.OffResMap,OffResTimeArr);
+        clear('RxProfs','KernHolder','OffResTimeArr');
+        ReconObj.OffResMap = [];
     else
         StitchIt = StitchItWaveletV1a();
+        StitchIt.Initialize(KernHolder,ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.DispStatObj);
+        StitchIt.LoadRxProfs(RxProfs);
+        clear('RxProfs','KernHolder');
     end
-    StitchIt.SetDoMemRegister(ReconObj.DoMemRegister);
-    StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
     StitchIt.SetLevelsPerDim(ReconObj.LevelsPerDim);
     StitchIt.SetNumIterations(ReconObj.NumIterations);
     StitchIt.SetLambda(ReconObj.Lambda);
     StitchIt.SetMaxEig(ReconObj.MaxEig);      
-    RxChannels = DataObj0.RxChannels;
-    StitchIt.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},RxChannels,ReconObj.DispStatObj); 
-    Image = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,length(DataObjArr)],'like',RxProfs);
+
+    Image = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,length(DataObjArr)],'like',single(1+1i));
     for n = 1:length(DataObjArr)
-        if ReconObj.ResetGpus
-            ReconObj.DispStatObj.Status('Reset GPUs',3);            % Would be nice to fix the memory leak
-            for m = 1:gpuDeviceCount
-                gpuDevice(m);
-            end
-        end 
         ReconObj.DispStatObj.Status('Load Data',3);
         if length(DataObjArr) > 1 || ReconObj.CreateInitialImage == 0
             if ReconObj.UseExternalShift
@@ -172,15 +214,15 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
         end
         Data = DataObjArr{n}.DataObj.ScaleData(StitchIt,Data);
         ReconObj.DispStatObj.Status('Generate',3);
-        if ReconObj.OffResCorrection
-            Image(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,OffResMapInt,OffResTimeArr,ReconObj.Image0(:,:,:,n));
+        if ReconObj.IntensityCorrection
+            Image(:,:,:,n) = StitchIt.CreateImage(Data,ReconObj.Image0(:,:,:,n)) .* abs(IntenseCor);
         else
-            Image(:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,ReconObj.Image0(:,:,:,n));
+            Image(:,:,:,n) = StitchIt.CreateImage(Data,ReconObj.Image0(:,:,:,n));
         end
         AbsMaxEig(n) = abs(StitchIt.MaxEig);
     end
     ReconObj.SetMaxEig(AbsMaxEig);
-    clear StitchIt
+    clear('StitchIt');
     ReconObj.DispStatObj.StatusClear();
 end
 
@@ -191,8 +233,11 @@ end
 function SetBaseMatrix(ReconObj,val)    
     ReconObj.BaseMatrix = val;
 end
-function SetDoMemRegister(ReconObj,val)    
-    ReconObj.DoMemRegister = val;
+function SetLowRamCase(ReconObj,val)    
+    ReconObj.LowRamCase = val;
+end
+function SetLowGpuRamCase(ReconObj,val)    
+    ReconObj.LowGpuRamCase = val;
 end
 function SetAcqInfo(ReconObj,val)    
     ReconObj.AcqInfo = val;

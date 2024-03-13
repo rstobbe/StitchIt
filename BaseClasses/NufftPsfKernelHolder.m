@@ -5,7 +5,7 @@
 classdef NufftPsfKernelHolder < handle
 
 properties (SetAccess = private)                   
-    KernelFile = 'KBCw2b16ss4'                   
+    KernelFile = 'KBCw2p4b12ss2p5'                   
     Kernel
     InvFiltFile
     InvFilt
@@ -66,7 +66,7 @@ end
                 StitchIt.SetGridMatrix(PossibleZeroFill(ind));
             end
             if StitchIt.GridMatrix < SubSampMatrix
-                error(['Specified GridMatrix is too small. Min: ',num2str(round(SubSampMatrix))]);
+                error(['Specified GridMatrix is too small. Min: ',num2str(ceil(SubSampMatrix))]);
             end
             if isempty(obj.InvFiltFile)
                 if StitchIt.TestFov2ReturnGridMatrix

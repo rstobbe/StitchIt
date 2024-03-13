@@ -25,6 +25,7 @@ classdef NufftIterate < handle
         NumRunsForward
         SimulationScale = 0
         DoMemRegister = 1
+        UseSdc = 1
     end
     
     methods 
@@ -36,6 +37,13 @@ classdef NufftIterate < handle
             obj.NufftFuncs = NufftFunctions();
         end                        
 
+%==================================================================
+% SetUseSdc
+%==================================================================           
+        function SetUseSdc(obj,val)
+            obj.UseSdc = val;
+        end        
+        
 %==================================================================
 % SetSimulationScale
 %==================================================================           
@@ -53,17 +61,17 @@ classdef NufftIterate < handle
 %==================================================================
 % Initialize
 %==================================================================   
-        function Initialize(obj,Stitch,KernHolder,AcqInfo,RxChannels,OtherGpuMemNeeded)
+        function Initialize(obj,KernHolder,AcqInfo,OtherGpuMemNeeded)
 
-            if nargin < 7
+            if nargin < 4
                 OtherGpuMemNeeded = 0;
             end
             
-            obj.NumGpuUsed = Stitch.Gpus2Use;
-            obj.BaseMatrix = Stitch.BaseMatrix;
-            obj.GridMatrix = Stitch.GridMatrix;
-            obj.TempMatrix = Stitch.BaseMatrix;
-            obj.RxChannels = RxChannels;
+            obj.NumGpuUsed = KernHolder.Gpus2Use;
+            obj.BaseMatrix = KernHolder.BaseMatrix;
+            obj.GridMatrix = KernHolder.GridMatrix;
+            obj.TempMatrix = KernHolder.BaseMatrix;
+            obj.RxChannels = KernHolder.RxChannels;
             
             %--------------------------------------
             % Receive Batching

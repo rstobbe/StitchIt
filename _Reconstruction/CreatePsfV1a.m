@@ -27,6 +27,7 @@ end
 %==================================================================  
 function [Image,err] = CreateImage(ReconObj)         
     %% Reset GPUs
+    err.flag = 0;
     if ReconObj.ResetGpus
         ReconObj.DispStatObj.Status('Reset GPUs',2);
         for n = 1:gpuDeviceCount
@@ -38,7 +39,7 @@ function [Image,err] = CreateImage(ReconObj)
     ReconObj.DispStatObj.Status('Create Psf',2);
     StitchItPsf = StitchItNufftPsfV1a();                                          
     StitchItPsf.SetBaseMatrix(ReconObj.BaseMatrix);
-    StitchItPsf.SetSubSample(2.5);
+    StitchItPsf.SetSubSample(2.0);
     StitchItPsf.SetFov2ReturnGridMatrix;
     RxChannels = 1;
     StitchItPsf.Initialize(ReconObj.AcqInfo{1},RxChannels); 

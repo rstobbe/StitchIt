@@ -22,6 +22,7 @@ classdef NufftReturnChannelsOffRes < handle
         OffResGridArr
         OffResGridBlockSize
         OffResLastGridBlockSize
+        UseSdc = 1
     end
     
     methods 
@@ -32,6 +33,13 @@ classdef NufftReturnChannelsOffRes < handle
         function [obj] = NufftReturnChannelsOffRes()
             obj.NufftFuncs = NufftOffResFunctions();
         end                        
+
+%==================================================================
+% SetUseSdc
+%==================================================================           
+        function SetUseSdc(obj,val)
+            obj.UseSdc = val;
+        end         
         
 %==================================================================
 % Initialize

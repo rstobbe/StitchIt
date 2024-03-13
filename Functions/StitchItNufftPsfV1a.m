@@ -31,10 +31,12 @@ classdef StitchItNufftPsfV1a < handle
 % SetSubSample
 %==================================================================          
         function SetSubSample(obj,val)
-            if val == 2.5
-                obj.KernHolder.SetKernelFile('KBCw4b24ss2p5');      
-            elseif val == 4
-                obj.KernHolder.SetKernelFile('KBCw2b16ss4');            % this is the default
+            if val == 2.0
+                obj.KernHolder.SetKernelFile('KBCw2p4b9ss2');  
+            elseif val == 2.5
+                obj.KernHolder.SetKernelFile('KBCw2p4b12ss2p5');             % this is the default      
+            elseif val == 3.2
+                obj.KernHolder.SetKernelFile('KBCw2p5b20ss3p2');           
             end
         end  
 
@@ -94,6 +96,7 @@ classdef StitchItNufftPsfV1a < handle
             Nufft = NufftReturnChannels();
             Nufft.Initialize(obj,obj.KernHolder,obj.AcqInfo,obj.RxChannels);
             Image = Nufft.Inverse(obj,Data);
+            Image = Image/max(abs(Image(:)));
         end
 
 %==================================================================

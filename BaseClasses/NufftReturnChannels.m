@@ -21,6 +21,8 @@ classdef NufftReturnChannels < handle
         DataMemPinBool = 0
         DoMemRegister = 1
         AvailableMemory
+        Fov2ReturnGridMatrix = 0
+        UseSdc = 1
     end
     
     methods 
@@ -33,6 +35,13 @@ classdef NufftReturnChannels < handle
         end                        
 
 %==================================================================
+% SetUseSdc
+%==================================================================           
+        function SetUseSdc(obj,val)
+            obj.UseSdc = val;
+        end         
+        
+%==================================================================
 % SetDoMemRegister
 %==================================================================           
         function SetDoMemRegister(obj,val)
@@ -42,19 +51,21 @@ classdef NufftReturnChannels < handle
 %==================================================================
 % Initialize
 %==================================================================   
-        function Initialize(obj,Stitch,KernHolder,AcqInfo,RxChannels)
-            obj.NumGpuUsed = Stitch.Gpus2Use;
-            obj.GridMatrix = Stitch.GridMatrix;
-            if Stitch.TestFov2ReturnGridMatrix
-                obj.TempMatrix = Stitch.GridMatrix;
+        function Initialize(obj,KernHolder,AcqInfo)
+            obj.NumGpuUsed = KernHolder.Gpus2Use;
+            obj.GridMatrix = KernHolder.GridMatrix;
+            if KernHolder.TestFov2ReturnGridMatrix
+                obj.TempMatrix = KernHolder.GridMatrix;
                 GridMemory = (obj.GridMatrix^3)*28;          % k-space + image + temp + invfilt (complex & single)
                 BaseImageMemory = 0;
+                obj.Fov2ReturnGridMatrix = 1;
             else
-                obj.BaseMatrix = Stitch.BaseMatrix;
+                obj.BaseMatrix = KernHolder.BaseMatrix;
                 GridMemory = (obj.GridMatrix^3)*16;          % k-space + image (complex & single)
                 BaseImageMemory = (obj.BaseMatrix^3)*12;     % image + invfilt (complex & single)
+                obj.Fov2ReturnGridMatrix = 0;
             end    
-            obj.RxChannels = RxChannels;
+            obj.RxChannels = KernHolder.RxChannels;
             
             %--------------------------------------
             % Receive Batching
@@ -79,16 +90,16 @@ classdef NufftReturnChannels < handle
 %==================================================================
 % Inverse
 %================================================================== 
-        function Image = Inverse(obj,Stitch,Data)
+        function Image = Inverse(obj,Data)
             if obj.RxChannels > 1
                 obj.NufftFuncs.RegisterHostComplexMemCuda(Data);
                 obj.DataMemPinBool = 1;
             end
             if obj.ImageMemPinBool == 0 
-                if Stitch.TestFov2ReturnGridMatrix
-                    obj.ImageMemPin = complex(zeros([Stitch.GridMatrix Stitch.GridMatrix Stitch.GridMatrix,obj.RxChannels],'single'),0);
+                if obj.Fov2ReturnGridMatrix
+                    obj.ImageMemPin = complex(zeros([obj.GridMatrix obj.GridMatrix obj.GridMatrix,obj.RxChannels],'single'),0);
                 else
-                    obj.ImageMemPin = complex(zeros([Stitch.BaseMatrix Stitch.BaseMatrix Stitch.BaseMatrix,obj.RxChannels],'single'),0);
+                    obj.ImageMemPin = complex(zeros([obj.BaseMatrix obj.BaseMatrix obj.BaseMatrix,obj.RxChannels],'single'),0);
                 end
                 if obj.DoMemRegister
                     obj.NufftFuncs.RegisterHostComplexMemCuda(obj.ImageMemPin);
@@ -130,7 +141,7 @@ classdef NufftReturnChannels < handle
                         end 
                         obj.NufftFuncs.InverseFourierTransform(GpuNum);
                     end
-                    if Stitch.TestFov2ReturnGridMatrix
+                    if obj.Fov2ReturnGridMatrix
                         for m = 1:obj.NumGpuUsed
                             GpuNum = m-1;
                             ChanNum = (q-1)*obj.ReconRxBatches + (p-1)*obj.NumGpuUsed + m;
@@ -195,7 +206,7 @@ classdef NufftReturnChannels < handle
                 GpuNum = m-1;
                 obj.NufftFuncs.CudaDeviceWait(GpuNum);
             end
-            Scale = 1/obj.NufftFuncs.ConvScaleVal * single(Stitch.BaseMatrix).^1.5 / single(Stitch.GridMatrix)^3;
+            Scale = 1/obj.NufftFuncs.ConvScaleVal * single(obj.BaseMatrix).^1.5 / single(obj.GridMatrix)^3;
             Image = obj.ImageMemPin*Scale;
             
             if obj.DataMemPinBool

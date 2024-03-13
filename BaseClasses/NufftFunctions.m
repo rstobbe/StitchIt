@@ -49,10 +49,18 @@ classdef NufftFunctions < NufftGpu
             if sz(3) == 4
                 ReconInfoMat0 = permute(AcqInfo.ReconInfoMat,[3 1 2]);
                 ReconInfoMat(1:3,:,:) = SubSamp*(ReconInfoMat0(1:3,:,:)/kStep) + kMatCentre + kShift;     
-                ReconInfoMat(4,:,:) = ReconInfoMat0(4,:,:);
+                if Nufft.UseSdc
+                    ReconInfoMat(4,:,:) = ReconInfoMat0(4,:,:);
+                else
+                    ReconInfoMat(4,:,:) = ones(size(ReconInfoMat0(4,:,:)));
+                end
             else
                 ReconInfoMat(1:3,:,:) = SubSamp*(AcqInfo.ReconInfoMat(1:3,:,:)/kStep) + kMatCentre + kShift;     
-                ReconInfoMat(4,:,:) = AcqInfo.ReconInfoMat(4,:,:);
+                if Nufft.UseSdc
+                    ReconInfoMat(4,:,:) = AcqInfo.ReconInfoMat(4,:,:);
+                else
+                    ReconInfoMat(4,:,:) = ones(size(AcqInfo.ReconInfoMat(4,:,:)));
+                end
             end
             
             %--------------------------------------

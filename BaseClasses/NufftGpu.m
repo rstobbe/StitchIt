@@ -956,10 +956,12 @@ classdef NufftGpu < handle
 %==================================================================                      
         function FreeRcvrProfMatricesGpuMem(obj)
             func = str2func(['FreeAllGpuMem',obj.CompCap]);
-            [Error] = func(obj.NumGpuUsed,obj.HRcvrProfMatrix(1,:));
-            if not(strcmp(Error,'no error'))
-                error(Error);
-            end
+            for n = 1:obj.ChanPerGpu
+                [Error] = func(obj.NumGpuUsed,obj.HRcvrProfMatrix(n,:));
+                if not(strcmp(Error,'no error'))
+                    error(Error);
+                end
+            end            
             obj.HRcvrProfMatrix = [];
         end         
         
