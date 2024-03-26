@@ -43,7 +43,7 @@ end
 %==================================================================  
 function [Image,err] = CreateImage(ReconObj,DataObjArr)     
     %% Status Display
-    ReconObj.DispStatObj.StatusClear();
+    %ReconObj.DispStatObj.StatusClear();
     ReconObj.DispStatObj.Status('ReconStitchItWavelet',1);
     
     %% Test  
@@ -87,9 +87,9 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     %% NufftKernel
     ReconObj.DispStatObj.Status('Load Nufft Kernel',2);
     KernHolder = NufftKernelHolder();
-    if ReconObj.LowGpuRamCase
-        KernHolder.SetReducedSubSamp();           % probably not a big savings...
-    end
+%     if ReconObj.LowGpuRamCase
+%         KernHolder.SetReducedSubSamp();           % probably not a big savings...
+%     end
     KernHolder.SetBaseMatrix(ReconObj.BaseMatrix);
     KernHolder.Initialize(ReconObj.AcqInfoRxp,DataObj0.RxChannels);
     
@@ -223,7 +223,7 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     end
     ReconObj.SetMaxEig(AbsMaxEig);
     clear('StitchIt');
-    ReconObj.DispStatObj.StatusClear();
+    %ReconObj.DispStatObj.StatusClear();
 end
 
 %==================================================================

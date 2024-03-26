@@ -14,6 +14,7 @@ classdef DisplayStatusObject < handle
         DisplayInitialImages = 0
         DisplayIterations = 0
         DisplayIterationStep = 1
+        DisplayIntensityCorrection = 0
         SaveIterationStep = 0
         PrevStringLen = 0
         SaveIterationPath
@@ -42,10 +43,13 @@ classdef DisplayStatusObject < handle
             if obj.Compass
                 Status2('busy',String,Level);
             end
-            back = repmat('\b',1,obj.PrevStringLen);
-            fprintf(back);
-            fprintf(String);
-            obj.PrevStringLen = length(String);
+%             back = repmat('\b',1,obj.PrevStringLen);
+%             fprintf(back);
+%             fprintf(String);
+%             obj.PrevStringLen = length(String);
+            if Level < 3
+                disp(String);
+            end
         end
 
 %==================================================================
@@ -73,10 +77,25 @@ classdef DisplayStatusObject < handle
             end
             if obj.DisplaySensitivityMaps
                 totgblnum = ImportImageCompass(SensMaps,'SensMaps');
+                TabReset('IM3');
                 Gbl2ImageOrtho('IM3',totgblnum);
             end
-        end         
-
+        end
+        
+%==================================================================
+% TestDisplayIntensityCorrection
+%==================================================================         
+        function TestDisplayIntensityCorrection(obj,IntenseCor)  
+            if ~obj.Compass
+                return
+            end
+            if obj.DisplayIntensityCorrection
+                totgblnum = ImportImageCompass(IntenseCor,'IntenseCor');
+                TabReset('IM3');
+                Gbl2ImageOrtho('IM3',totgblnum);
+            end
+        end          
+        
 %==================================================================
 % TestDisplayCombinedImages
 %==================================================================         
@@ -86,6 +105,7 @@ classdef DisplayStatusObject < handle
             end
             if obj.DisplayCombinedImages
                 totgblnum = ImportImageCompass(CombImage,'CombImage');
+                TabReset('IM3');
                 Gbl2ImageOrtho('IM3',totgblnum);
             end
         end        
@@ -99,6 +119,7 @@ classdef DisplayStatusObject < handle
             end
             if obj.DisplayRxProfs
                 totgblnum = ImportImageCompass(RxProfs,'RxProfs');
+                TabReset('IM3');
                 Gbl2ImageOrtho('IM3',totgblnum);
             end
         end        
@@ -112,6 +133,7 @@ classdef DisplayStatusObject < handle
             end
             if obj.DisplayOffResMap
                 totgblnum = ImportOffResMapCompass(OffResMap,'OffResMap',[],[],max(abs(OffResMap(:))));
+                TabReset('IM3');
                 Gbl2ImageOrtho('IM3',totgblnum);
             end
         end          
@@ -129,6 +151,7 @@ classdef DisplayStatusObject < handle
                 else
                     totgblnum = ImportImageCompass(Image0,Name);
                 end
+                TabReset('IM3');
                 Gbl2ImageOrtho('IM3',totgblnum);
             end
         end
@@ -164,6 +187,7 @@ classdef DisplayStatusObject < handle
             if obj.DisplayIterations
                 if rem(nit,obj.DisplayIterationStep) == 0
                     totgblnum = ImportImageCompass(Image,['StitchIteration',num2str(nit)],obj.SaveIterationStep,obj.SaveIterationPath);
+                    TabReset('IM3');
                     Gbl2ImageOrtho('IM3',totgblnum);
                 end
             end
@@ -201,6 +225,9 @@ classdef DisplayStatusObject < handle
         end
         function SetDisplayIterationStep(obj,val)    
             obj.DisplayIterationStep = val;
+        end
+        function SetDisplayIntensityCorrection(obj,val)    
+            obj.DisplayIntensityCorrection = val;
         end
         function SetSaveIterationStep(obj,val)    
             obj.SaveIterationStep = val;

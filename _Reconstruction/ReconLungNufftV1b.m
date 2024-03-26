@@ -20,6 +20,7 @@ properties (SetAccess = private)
     RespPhaseImages2Do = 1
     LowRamCase = 0
     LowGpuRamCase = 0
+    IntensityCorrection = 0                 % Doesn't work like in brain
 end
 
 methods 
@@ -35,6 +36,10 @@ end
 % CreateImage
 %==================================================================  
 function [Image,err] = CreateImage(ReconObj,DataObjArr)     
+    %% Status Display
+    %ReconObj.DispStatObj.StatusClear();
+    ReconObj.DispStatObj.Status('ReconLungNufft',1);
+    
     %% Test  
     DataObj0 = DataObjArr{1}.DataObj;
     ReconObj.DispStatObj.SetDataObj(DataObj0);
@@ -88,21 +93,37 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
         end
     end
     
+    %% NufftKernel
+    ReconObj.DispStatObj.Status('Load Nufft Kernel',2);
+    KernHolder = NufftKernelHolder();
+%     if ReconObj.LowGpuRamCase
+%         KernHolder.SetReducedSubSamp();           % probably not a big savings...
+%     end
+    KernHolder.SetBaseMatrix(ReconObj.BaseMatrix);
+    KernHolder.Initialize(ReconObj.AcqInfoRxp,DataObj0.RxChannels);
+    
     %% Setup
     if ~ReconObj.LowGpuRamCase
         % RxProf Setup
         ReconObj.DispStatObj.Status('RxProf Initialize',2);
         StitchItRx = StitchItReturnRxProfs();
         StitchItRx.SetUnallocateRamOnFinish(ReconObj.LowRamCase);                                             
-        StitchItRx.SetBaseMatrix(ReconObj.BaseMatrix);
-        StitchItRx.Initialize(ReconObj.AcqInfoRxp,DataObj0.RxChannels);      
+        StitchItRx.Initialize(KernHolder,ReconObj.AcqInfoRxp);    
 
         % StitchIt Setup
         ReconObj.DispStatObj.Status('Nufft Recon Initialize',2);
         StitchIt = StitchItNufftV1a(); 
         StitchIt.SetUnallocateRamOnFinish(ReconObj.LowRamCase); 
-        StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
-        StitchIt.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels);       
+        StitchIt.Initialize(KernHolder,ReconObj.AcqInfo{ReconObj.ReconNumber});
+        
+        % Intensity Correction
+        if ReconObj.IntensityCorrection
+            ReconObj.DispStatObj.Status('Intensity Correction Initialize',2);
+            StitchItI = StitchItNufftV1a();
+            StitchItI.Nufft.SetUseSdc(0);
+            StitchItI.SetUnallocateRamOnFinish(ReconObj.LowRamCase); 
+            StitchItI.Initialize(KernHolder,ReconObj.AcqInfo{ReconObj.ReconNumber});
+        end         
     end      
     Image = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,NumImages],'like',single(1+1i)); 
     
@@ -114,8 +135,7 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
             ReconObj.DispStatObj.Status('RxProf Initialize',2);
             StitchItRx = StitchItReturnRxProfs();
             StitchItRx.SetUnallocateRamOnFinish(ReconObj.LowRamCase);                                             
-            StitchItRx.SetBaseMatrix(ReconObj.BaseMatrix);
-            StitchItRx.Initialize(ReconObj.AcqInfoRxp,DataObj0.RxChannels);
+            StitchItRx.Initialize(KernHolder,ReconObj.AcqInfoRxp); 
         end
         ReconObj.DispStatObj.Status(['RxProfs ',num2str(ReconObj.RespPhaseImages2Do(nim))],2);
         Data = DoTrajMash(DataRxProfFull,WeightArr(:,ReconObj.RespPhaseImages2Do(nim)),DataObj0.NumAverages);
@@ -125,23 +145,48 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
         if ReconObj.LowGpuRamCase
             clear StitchItRx
         end
+          
+        % Intensity Correction
+        if ReconObj.IntensityCorrection
+            if ReconObj.LowGpuRamCase
+                ReconObj.DispStatObj.Status('Intensity Correction Initialize',2);
+                StitchItI = StitchItNufftV1a();
+                StitchItI.Nufft.SetUseSdc(0);
+                StitchItI.SetUnallocateRamOnFinish(ReconObj.LowRamCase); 
+                StitchItI.Initialize(KernHolder,ReconObj.AcqInfo{ReconObj.ReconNumber});
+            end
+            Data = DoTrajMash(DataFull,WeightArr(:,ReconObj.RespPhaseImages2Do(nim)),DataObj0.NumAverages);
+            Data = DataObj0.ScaleData(StitchItI,Data);
+            ReconObj.DispStatObj.Status(['Intensity Correction ',num2str(ReconObj.RespPhaseImages2Do(nim))],2);
+            StitchItI.LoadRxProfs(RxProfs);
+            IntenseCor = StitchItI.CreateImage(Data);
+            ReconObj.DispStatObj.TestDisplayIntensityCorrection(IntenseCor);
+            if ReconObj.LowGpuRamCase
+                clear StitchItI
+            end
+        end          
         
         % Image
         if ReconObj.LowGpuRamCase
             ReconObj.DispStatObj.Status('Nufft Recon Initialize',2);
             StitchIt = StitchItNufftV1a(); 
             StitchIt.SetUnallocateRamOnFinish(ReconObj.LowRamCase); 
-            StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
-            StitchIt.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels);
+            StitchIt.Initialize(KernHolder,ReconObj.AcqInfo{ReconObj.ReconNumber});
+        end
+        if ~ReconObj.IntensityCorrection
+            Data = DoTrajMash(DataFull,WeightArr(:,ReconObj.RespPhaseImages2Do(nim)),DataObj0.NumAverages);
+            Data = DataObj0.ScaleData(StitchIt,Data);
         end
         ReconObj.DispStatObj.Status(['Nufft Recon ',num2str(ReconObj.RespPhaseImages2Do(nim))],2);
-        Data = DoTrajMash(DataFull,WeightArr(:,ReconObj.RespPhaseImages2Do(nim)),DataObj0.NumAverages);
-        Data = DataObj0.ScaleData(StitchIt,Data);
         StitchIt.LoadRxProfs(RxProfs);
         if ReconObj.LowRamCase
             RxProfs = [];                           % unallocate this memory
         end
-        Image(:,:,:,nim) = StitchIt.CreateImage(Data);
+        if ReconObj.IntensityCorrection
+            Image(:,:,:,nim) = StitchIt.CreateImage(Data) .* abs(IntenseCor);
+        else
+            Image(:,:,:,nim) = StitchIt.CreateImage(Data);
+        end        
         ReconObj.DispStatObj.TestDisplayInitialImages(Image(:,:,:,nim),['Image',num2str(ReconObj.RespPhaseImages2Do(nim))]);
         if ReconObj.LowGpuRamCase
             clear StitchIt
@@ -149,7 +194,8 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     end
     clear StitchIt
     clear StitchItRx
-    ReconObj.DispStatObj.StatusClear();
+    clear StitchItI
+    %ReconObj.DispStatObj.StatusClear();
 
 end
 

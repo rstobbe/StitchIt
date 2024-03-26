@@ -114,18 +114,25 @@ function [OffResMap,err] = CreateOffResMap(ReconObj,DataObjArr)
     
     ReconObj.DispStatObj.Status('Create Map',3);
     TimeDiff = (ReconObj.AcqInfoOffRes{2}.SampStartTime - ReconObj.AcqInfoOffRes{1}.SampStartTime)/1000;
-    OffResMap0 = (angle(Image2)-angle(Image1))/(2*pi*TimeDiff);
-    OffResMap = single(OffResMap0);
     
-    MaxFreq = 0.5/TimeDiff;    
-    OffResMap(OffResMap0 < -MaxFreq) = 1/TimeDiff + OffResMap0(OffResMap0 < -MaxFreq);
-    OffResMap(OffResMap0 > MaxFreq) = OffResMap0(OffResMap0 > MaxFreq) - 1/TimeDiff;
+    AngleDiff = (angle(Image2)-angle(Image1));
+    AngleDiff(AngleDiff > pi) = 2*pi - AngleDiff(AngleDiff > pi);
+    AngleDiff(AngleDiff < -pi) = -2*pi + AngleDiff(AngleDiff < -pi); 
     
-    MaskImage = abs(Image1);
-    OffResMap(MaskImage < ReconObj.RelMaskVal*max(MaskImage(:))) = 0;
-    MaskImage = abs(Image2);
-    OffResMap(MaskImage < ReconObj.RelMaskVal*max(MaskImage(:))) = 0;
-    OffResMap(OffResMap < ReconObj.NegFreqMask) = 0;        
+    OffResMap = AngleDiff;
+    
+    %OffResMap0 = /(2*pi*TimeDiff);
+    %OffResMap = single(OffResMap0);
+    
+%     MaxFreq = 0.5/TimeDiff;    
+%     OffResMap(OffResMap0 < -MaxFreq) = 1/TimeDiff + OffResMap0(OffResMap0 < -MaxFreq);
+%     OffResMap(OffResMap0 > MaxFreq) = OffResMap0(OffResMap0 > MaxFreq) - 1/TimeDiff;
+%     
+%     MaskImage = abs(Image1);
+%     OffResMap(MaskImage < ReconObj.RelMaskVal*max(MaskImage(:))) = 0;
+%     MaskImage = abs(Image2);
+%     OffResMap(MaskImage < ReconObj.RelMaskVal*max(MaskImage(:))) = 0;
+%     OffResMap(OffResMap < ReconObj.NegFreqMask) = 0;        
 end
 
 %==================================================================

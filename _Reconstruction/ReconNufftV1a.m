@@ -36,8 +36,8 @@ end
 %==================================================================  
 function [Image,err] = CreateImage(ReconObj,DataObjArr)     
     %% Status Display
-    ReconObj.DispStatObj.StatusClear();
-    ReconObj.DispStatObj.Status('ReconStitchItNufft',1);
+    %ReconObj.DispStatObj.StatusClear();
+    ReconObj.DispStatObj.Status('ReconNufft',1);
     
     %% Test  
     DataObj0 = DataObjArr{1}.DataObj;
@@ -112,8 +112,7 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
         StitchIt.LoadRxProfs(RxProfs);  
         ReconObj.DispStatObj.Status('Generate',3);
         IntenseCor = StitchIt.CreateImage(Data);
-        %totgblnum = ImportImageCompass(Image,'IntensCorTest');
-        %Gbl2ImageOrtho('IM3',totgblnum);
+        ReconObj.DispStatObj.TestDisplayIntensityCorrection(IntenseCor);
         clear('StitchIt','Data');
     end
     
@@ -171,7 +170,7 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
         end
     end
     clear('StitchIt');
-    ReconObj.DispStatObj.StatusClear();
+    %ReconObj.DispStatObj.StatusClear();
 
 end
 
@@ -207,11 +206,17 @@ end
 function SetOffResCorrection(ReconObj,val)    
     ReconObj.OffResCorrection = val;
 end
+function SetIntensityCorrection(ReconObj,val)    
+    ReconObj.IntensityCorrection = val;
+end
 function SetUseExternalShift(ReconObj,val)    
     ReconObj.UseExternalShift = val;
 end
 function SetDisplayRxProfs(ReconObj,val)    
     ReconObj.DispStatObj.SetDisplayRxProfs(val);
+end
+function SetDisplayIntensityCorrection(ReconObj,val)    
+    ReconObj.DispStatObj.SetDisplayIntensityCorrection(val);
 end
 function SetDisplayOffResMap(ReconObj,val)    
     ReconObj.DispStatObj.SetDisplayOffResMap(val);
