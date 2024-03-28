@@ -145,7 +145,7 @@ classdef SiemensStitchItDataObject < handle
 %==================================================================
 % ScaleData
 %==================================================================   
-        function Data = ScaleData(obj,StitchIt,Data)
+        function Data = ScaleData(obj,KernHolder,Data)
             Scale = 1;
             Data = Data*Scale;
         end             

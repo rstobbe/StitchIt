@@ -9,7 +9,6 @@ properties (SetAccess = private)
     Method = 'ReconNufftRetChanV1a'
     BaseMatrix
     AcqInfo
-    AcqInfoRxp
     ReconNumber = 1
     Rcvrs
     OffResMap
@@ -17,6 +16,7 @@ properties (SetAccess = private)
     UseExternalShift = 0
     OffResCorrection = 0
     ResetGpus = 1
+    LowGpuRamCase = 0
     DispStatObj
 end
 
@@ -33,6 +33,10 @@ end
 % CreateImage
 %==================================================================  
 function [Image,err] = CreateImage(ReconObj,DataObjArr)     
+    %% Status Display
+    %ReconObj.DispStatObj.StatusClear();
+    ReconObj.DispStatObj.Status('ReconNufftRetChanV1a',1);
+    
     %% Test  
     DataObj0 = DataObjArr{1}.DataObj;
     ReconObj.DispStatObj.SetDataObj(DataObj0);
@@ -64,6 +68,15 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
         end
     end
 
+    %% NufftKernel
+    ReconObj.DispStatObj.Status('Load Nufft Kernel',2);
+    KernHolder = NufftKernelHolder();
+    if ReconObj.LowGpuRamCase
+        KernHolder.SetReducedSubSamp();           % Important for very large zero-fill.  
+    end
+    KernHolder.SetBaseMatrix(ReconObj.BaseMatrix);
+    KernHolder.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels);    
+    
     %% Interpolate
     if ReconObj.OffResCorrection
         ReconObj.DispStatObj.Status('Off Resonance Map',2);
@@ -80,38 +93,35 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     OffResTimeArr = ReconObj.AcqInfo{ReconObj.ReconNumber}.OffResTimeArr;
     
     %% Image
-    ReconObj.DispStatObj.Status('Nufft Recon Return Channels',2);
-    ReconObj.DispStatObj.Status('Initialize',3);
+    ReconObj.DispStatObj.Status('Nufft Recon Return Channels Initialize',2);
     if ReconObj.OffResCorrection
         error('not coded');
-        StitchIt = StitchItNufftOffResV1a();
+        %StitchIt = StitchItReturnChannelsOffRes();
     else
-        StitchIt = StitchItNufftReturnChannelsV1a(); 
+        StitchIt = StitchItReturnChannels(); 
     end
-    StitchIt.SetBaseMatrix(ReconObj.BaseMatrix);
-    StitchIt.SetFov2ReturnBaseMatrix;
-    StitchIt.Initialize(ReconObj.AcqInfo{ReconObj.ReconNumber},DataObj0.RxChannels); 
+    StitchIt.Initialize(KernHolder,ReconObj.AcqInfo{ReconObj.ReconNumber}); 
     DataType = single(1 + 1i);
     Image = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,DataObj0.RxChannels,length(DataObjArr)],'like',DataType);
     for n = 1:length(DataObjArr)
-        ReconObj.DispStatObj.Status(['Nufft Recon ',num2str(n)],2);
+        ReconObj.DispStatObj.Status(['Nufft Recon Return Channels ',num2str(n)],2);
         ReconObj.DispStatObj.Status('Load Data',3);
         if ReconObj.UseExternalShift
             Data = DataObjArr{n}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
         else
             Data = DataObjArr{n}.DataObj.ReturnDataSetWithShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber);
         end
-        Data = DataObjArr{n}.DataObj.ScaleData(StitchIt,Data);
+        Data = DataObjArr{n}.DataObj.ScaleData(KernHolder,Data);        % should update to 'KernHolder' everywhere
         ReconObj.DispStatObj.Status('Generate',3);
         if ReconObj.OffResCorrection
             error('not coded');
-            Image(:,:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,OffResMapInt,OffResTimeArr);
+            %Image(:,:,:,:,n) = StitchIt.CreateImage(Data,RxProfs,OffResMapInt,OffResTimeArr);
         else
             Image(:,:,:,:,n) = StitchIt.CreateImage(Data);
         end
     end
-    clear StichIt
-    ReconObj.DispStatObj.StatusClear();
+    clear StitchIt
+    %ReconObj.DispStatObj.StatusClear();
 
 end
 
@@ -124,9 +134,6 @@ function SetBaseMatrix(ReconObj,val)
 end
 function SetAcqInfo(ReconObj,val)    
     ReconObj.AcqInfo = val;
-end
-function SetAcqInfoRxp(ReconObj,val)    
-    ReconObj.AcqInfoRxp = val;
 end
 function SetAcqInfoOffRes(ReconObj,val)    
     ReconObj.AcqInfoOffRes = val;
@@ -156,7 +163,9 @@ end
 function SetDisplayOffResMap(ReconObj,val)    
     ReconObj.DispStatObj.SetDisplayOffResMap(val);
 end
-
+function SetLowGpuRamCase(ReconObj,val)    
+    ReconObj.LowGpuRamCase = val;
+end
 
 end
 end

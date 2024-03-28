@@ -3,7 +3,7 @@
 %   
 %================================================================
 
-classdef StitchItReturnChannelsOffRes < handle
+classdef StitchItReturnChannels < handle
 
     properties (SetAccess = private)                                     
         Nufft
@@ -15,9 +15,8 @@ classdef StitchItReturnChannelsOffRes < handle
 %==================================================================
 % Constructor
 %==================================================================   
-        function [obj] = StitchItReturnChannelsOffRes()
-            obj.Nufft = NufftReturnChannelsOffRes(); 
-            error('finish');
+        function [obj] = StitchItReturnChannels()
+            obj.Nufft = NufftReturnChannels(); 
         end       
 
 %==================================================================
