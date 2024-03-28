@@ -76,7 +76,7 @@ classdef SimulationStitchItDataObject < handle
             obj.DataInfo.Seq = 'Simulation';
             obj.DataInfo.Protocol = SAMP.name;
             obj.DataInfo.VolunteerID = SAMP.name;
-            obj.DataInfo.TrajName = '';
+            obj.DataInfo.TrajName = SAMP.TrajName;
             obj.DataInfo.TrajImpName = '';
             obj.DataInfo.RxChannels = 1;
             if isfield(SAMP,'ZF')
@@ -102,16 +102,24 @@ classdef SimulationStitchItDataObject < handle
 %==================================================================
 % ScaleData
 %==================================================================   
-        function Data = ScaleData(obj,StitchIt,Data)
-            Scale = ((StitchIt.GridMatrix/obj.DataInfo.SimSampGridMatrix)^3)/StitchIt.BaseMatrix^1.5;
+        function Data = ScaleData(obj,KernHolder,Data)
+            %Scale = ((KernHolder.GridMatrix/obj.DataInfo.SimSampGridMatrix)^3)/KernHolder.BaseMatrix^1.5;              This might depend on the recon...
+            Scale = (KernHolder.GridMatrix/obj.DataInfo.SimSampGridMatrix)^1.5;
             Data = Data*Scale;
         end        
+
+%==================================================================
+% ReturnDataSetWithShift
+%================================================================== 
+        function Data = ReturnDataSetWithShift(obj,AcqInfo,ReconNumber)
+            Data = obj.DataFull{ReconNumber};
+        end
         
 %==================================================================
 % ReturnDataSet
 %================================================================== 
-        function Data = ReturnDataSet(obj,AcqInfo,SetNum)  
-            Data = obj.DataFull{SetNum};
+        function Data = ReturnDataSet(obj,AcqInfo,ReconNumber)  
+            Data = obj.DataFull{ReconNumber};
         end        
         
             

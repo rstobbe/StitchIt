@@ -51,9 +51,9 @@ end
 %==================================================================          
         function SetSubSample(obj,val)
             if val == 1.25
-                obj.KernHolder.SetKernelFile('KBCw5b11ss1p25');  
+                obj.KernelFile = 'KBCw5b11ss1p25';  
             elseif val == 1.6
-                obj.KernHolder.SetKernelFile('KBCw2b5p5ss1p6');             % this is the default
+                obj.KernelFile = 'KBCw2b5p5ss1p6';             % this is the default
             end
         end               
         
