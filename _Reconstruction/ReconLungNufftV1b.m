@@ -21,6 +21,7 @@ properties (SetAccess = private)
     LowRamCase = 0
     LowGpuRamCase = 0
     IntensityCorrection = 0                 % Doesn't work like in brain
+    SaveFov = [400 400 400];    % Y-X-Z   (Has to be isotropic for now - need to decide how to save new Fov for display)
 end
 
 methods 
@@ -124,8 +125,14 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
             StitchItI.SetUnallocateRamOnFinish(ReconObj.LowRamCase); 
             StitchItI.Initialize(KernHolder,ReconObj.AcqInfo{ReconObj.ReconNumber});
         end         
-    end      
-    Image = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,NumImages],'like',single(1+1i)); 
+    end 
+    Fov = ReconObj.AcqInfoRxp.Fov;
+    for n = 1:3
+        Sz(n) = 2*round(((ReconObj.SaveFov(n)/Fov)*ReconObj.BaseMatrix)/2);
+        Start(n) = (ReconObj.BaseMatrix - Sz(n))/2; 
+        Stop(n) = Start(n) + Sz(n) - 1;
+    end
+    Image = zeros([Sz(1),Sz(2),Sz(3),NumImages],'like',single(1+1i));         
     
     %% Loop Through
     for nim = 1:NumImages
@@ -183,10 +190,11 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
             RxProfs = [];                           % unallocate this memory
         end
         if ReconObj.IntensityCorrection
-            Image(:,:,:,nim) = StitchIt.CreateImage(Data) .* abs(IntenseCor);
+            ImageOut = StitchIt.CreateImage(Data) .* abs(IntenseCor);
         else
-            Image(:,:,:,nim) = StitchIt.CreateImage(Data);
-        end        
+            ImageOut = StitchIt.CreateImage(Data);
+        end 
+        Image(:,:,:,nim) = ImageOut(Start(1):Stop(1),Start(2):Stop(2),Start(3):Stop(3));
         ReconObj.DispStatObj.TestDisplayInitialImages(Image(:,:,:,nim),['Image',num2str(ReconObj.RespPhaseImages2Do(nim))]);
         if ReconObj.LowGpuRamCase
             clear StitchIt
