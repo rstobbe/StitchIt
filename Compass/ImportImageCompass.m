@@ -12,17 +12,6 @@ function totgblnum = ImportImageCompass(Image,Name,Save,Path,DispWid)
         Path = [];
     end
 
-    Compass = 0;
-    Test = whos('global');
-    for n = 1:length(Test)
-        if strcmp(Test(n).name,'TOTALGBL')
-            Compass = 1;
-        end
-    end
-    if Compass == 0
-        return
-    end
-
     IMG.Im = Image;  
     IMG.ExpPars = [];
 
@@ -52,10 +41,15 @@ function totgblnum = ImportImageCompass(Image,Name,Save,Path,DispWid)
     %----------------------------------------------
     % Load Compass
     %----------------------------------------------
-    totalgbl{1} = IMG.name;
-    totalgbl{2} = IMG;
-    from = 'CompassLoad';
-    totgblnum = Load_TOTALGBL(totalgbl,'IM',from);
+    Test = whos('global');
+    for n = 1:length(Test)
+        if strcmp(Test(n).name,'TOTALGBL')
+            totalgbl{1} = IMG.name;
+            totalgbl{2} = IMG;
+            from = 'CompassLoad';
+            totgblnum = Load_TOTALGBL(totalgbl,'IM',from);
+        end
+    end
 
     %----------------------------------------------
     % Save
