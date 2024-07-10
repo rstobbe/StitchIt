@@ -31,6 +31,7 @@ classdef SampleOnResImage < handle
 % CreateImage
 %==================================================================         
         function Data = Sample(obj,Image)
+            obj.Nufft.ReStartForward;
             Data = obj.Nufft.Forward(Image);
             if obj.UnallocateRamOnFinish
                 obj.Nufft.UnallocateRamRxProfs;

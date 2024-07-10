@@ -11,6 +11,9 @@ function totgblnum = ImportImageCompass(Image,Name,Save,Path,DispWid)
         Save = 0;
         Path = [];
     end
+    if nargin < 2
+        Name = 'ImportImage';
+    end
 
     IMG.Im = Image;  
     IMG.ExpPars = [];
