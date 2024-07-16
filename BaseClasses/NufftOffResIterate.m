@@ -119,6 +119,13 @@ classdef NufftOffResIterate < handle
         end      
 
 %==================================================================
+% ReStartForward
+%==================================================================   
+        function ReStartForward(obj)
+            obj.NumRunsForward = 0; 
+        end
+
+%==================================================================
 % LoadRxProfs
 %==================================================================        
         function LoadRxProfs(obj,RxProfs)

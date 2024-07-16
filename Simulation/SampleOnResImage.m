@@ -28,7 +28,7 @@ classdef SampleOnResImage < handle
         end           
         
 %==================================================================
-% CreateImage
+% Sample
 %==================================================================         
         function Data = Sample(obj,Image)
             obj.Nufft.ReStartForward;
