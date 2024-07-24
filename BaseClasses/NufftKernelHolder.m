@@ -15,6 +15,7 @@ properties (SetAccess = private)
     GridMatrix
     Gpus2Use
     RxChannels
+    NumImages
 end
 
 methods 
@@ -107,19 +108,20 @@ end
 %==================================================================
 % Initialize
 %==================================================================   
-        function Initialize(obj,AcqInfo,RxChannels)   
+        function Initialize(obj,AcqInfo,NumImages)   
             
             %------------------------------------------------------
-            % RxChannels
+            % RxChannels / NumImages
             %------------------------------------------------------
-            obj.RxChannels = RxChannels;
-            
+            obj.RxChannels = NumImages;
+            obj.NumImages = NumImages;
+
             %------------------------------------------------------
             % Gpus
             %------------------------------------------------------
             GpuTot = gpuDeviceCount;
             if isempty(obj.Gpus2Use)
-                if RxChannels == 1
+                if NumImages == 1
                     obj.Gpus2Use = 1;
                 else
                     obj.Gpus2Use = GpuTot;
