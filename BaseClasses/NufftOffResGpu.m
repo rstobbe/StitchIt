@@ -37,6 +37,44 @@ classdef NufftOffResGpu < NufftGpu
         end          
 
 %==================================================================
+% LoadDiffOffResMapEachGpuMem
+%================================================================== 
+        function LoadDiffOffResMapEachGpuMem(obj,OffResMap)
+            sz = size(OffResMap);
+            if sum(sz(1:3)) ~= sum(obj.BaseImageMatrixMemDims)
+                error('Image dimensionality problem');
+            end
+            if length(sz) == 3
+                if obj.ChanPerGpu * obj.NumGpuUsed ~= 1
+                    error('Image dimensionality problem');
+                end
+                sz(4) = 1;
+            else
+                if sz(4) > (obj.ChanPerGpu * obj.NumGpuUsed)
+                    error('Image dimensionality problem');
+                end
+            end
+            if ~isa(OffResMap,'single')
+                error('Image must be in single format');
+            end 
+            if ~isreal(OffResMap)
+                error('OffResMap must be real');
+            end 
+            func = str2func(['LoadComplexMatrixSingleGpuMemAsync',obj.CompCap]);
+            for m = 1:obj.NumGpuUsed
+                GpuNum = uint64(m-1);
+                Image = Image0(:,:,:,m);
+                if isreal(Image)
+                    Image = complex(single(Image),0);
+                end   
+                [Error] = func(GpuNum,obj.HBaseHoldImageMatrix(1,:),Image);                  
+                if not(strcmp(Error,'no error'))
+                    error(Error);
+                end
+            end
+        end 
+
+%==================================================================
 % LoadOffResTimeArrGpuMem
 %==================================================================                      
         function LoadOffResTimeArrGpuMem(obj,OffResTimeArr)
@@ -126,6 +164,41 @@ classdef NufftOffResGpu < NufftGpu
                 end
             end
         end 
+
+%==================================================================
+% LoadBaseDiffImageMatricesGpuMem
+%================================================================== 
+        function LoadBaseDiffImageMatricesGpuMem(obj,Image0)
+            sz = size(Image0);
+            if sum(sz(1:3)) ~= sum(obj.BaseImageMatrixMemDims)
+                error('Image dimensionality problem');
+            end
+            if length(sz) == 3
+                if obj.ChanPerGpu * obj.NumGpuUsed ~= 1
+                    error('Image dimensionality problem');
+                end
+                sz(4) = 1;
+            else
+                if sz(4) > (obj.ChanPerGpu * obj.NumGpuUsed)
+                    error('Image dimensionality problem');
+                end
+            end
+            if ~isa(Image0,'single')
+                error('Image must be in single format');
+            end         
+            func = str2func(['LoadComplexMatrixSingleGpuMemAsync',obj.CompCap]);
+            for m = 1:obj.NumGpuUsed
+                GpuNum = uint64(m-1);
+                Image = Image0(:,:,:,m);
+                if isreal(Image)
+                    Image = complex(single(Image),0);
+                end   
+                [Error] = func(GpuNum,obj.HBaseImageMatrix(1,:),Image);                  
+                if not(strcmp(Error,'no error'))
+                    error(Error);
+                end
+            end
+        end         
 
 %% Initialize Matrices
                
@@ -272,6 +345,22 @@ classdef NufftOffResGpu < NufftGpu
                 error(Error);
             end
         end         
+
+%==================================================================
+% ReturnTempImageCidx
+%================================================================== 
+        function ReturnTempImageCidx(obj,GpuNum,ImageMatrix,ChanNum)
+            if GpuNum > obj.NumGpuUsed-1
+                error('Specified ''GpuNum'' beyond number of GPUs used');
+            end
+            GpuNum = uint64(GpuNum);
+            ChanNum = uint64(ChanNum);
+            func = str2func(['ReturnComplexMatrixSingleGpuCidx',obj.CompCap]);
+            [Error] = func(GpuNum,obj.HTempMatrix(1,:),ImageMatrix,ChanNum);
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end   
 
 %==================================================================
 % RcvrWgtBaseHoldImage

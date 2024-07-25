@@ -48,9 +48,9 @@ classdef NufftOffResDlDataGen < handle
             % Receive Batching
             %   - for limited memory GPUs (and/or many NumImages)
             %--------------------------------------             
-            GridMemory = (obj.GridMatrix^3)*16;          % k-space + image (complex & single)
-            BaseImageMemory = (obj.BaseMatrix^3)*36;     % basehold + image + temp + offresmap + invfilt (complex & single)
-            DataKspaceMemory = AcqInfo.NumTraj*AcqInfo.NumCol*16;
+            GridMemory = (obj.GridMatrix^3)*16;                         % k-space + image (complex & single)
+            BaseImageMemory = (obj.BaseMatrix^3)*32;                    % image + temp (complex & single) + offresmap + invfilt 
+            DataKspaceMemory = AcqInfo.NumTraj*AcqInfo.NumCol*8;        % (complex & single) 
             MemoryNeededTotal = GridMemory + BaseImageMemory + DataKspaceMemory;
             AvailableMemory = obj.NufftFuncs.GpuParams.AvailableMemory;
             if MemoryNeededTotal*1.1 > AvailableMemory
@@ -87,24 +87,27 @@ classdef NufftOffResDlDataGen < handle
 %==================================================================
 % LoadOffResonanceMap
 %==================================================================        
-        function LoadOffResonanceMap(obj,OffResMap)
+        function LoadDiffOffResonanceMapEachGpu(obj,OffResMap)
             obj.NufftFuncs.LoadOffResMapGpuMem(OffResMap);
         end
 
 %==================================================================
 % LoadImage
 %==================================================================        
-        function LoadImage(obj,Image)
+        function LoadDiffImageEachGpu(obj,Image)
             sz = size(Image);
+            if length(sz) == 3
+                sz(4) = 1;
+            end
             if sz(4) ~= obj.NumImages
                 error('Image array should be same as number of gpus')
             end
             % obj.NufftFuncs.RegisterHostComplexMemCuda(Image);                         % I think need to make 4D (not sure it there is value)
             % obj.ImageMemPinBool = 1;
-            obj.NufftFuncs.LoadBaseHoldDiffImageMatricesGpuMem(Image);
+            obj.NufftFuncs.LoadBaseDiffImageMatricesGpuMem(Image);
             for m = 1:obj.NumGpuUsed
                 GpuNum = m-1;
-                obj.NufftFuncs.MultInvFiltBaseHold(GpuNum);
+                obj.NufftFuncs.MultInvFiltBase(GpuNum);
             end
             % obj.NufftFuncs.UnRegisterHostMemCuda(Image);                
             % obj.ImageMemPinBool = 0;
@@ -144,17 +147,14 @@ classdef NufftOffResDlDataGen < handle
             end
             for m = 1:obj.NumGpuUsed
                 GpuNum = m-1;
-                obj.NufftFuncs.CudaDeviceWait(GpuNum);
-            end
-            for m = 1:obj.NumGpuUsed
-                GpuNum = m-1;
                 obj.NufftFuncs.ReturnSampDatCidx(GpuNum,obj.DataMemPin,m);
             end
             for m = 1:obj.NumGpuUsed
                 GpuNum = m-1;
                 obj.NufftFuncs.CudaDeviceWait(GpuNum);
             end
-            Scale = single(1/(obj.NufftFuncs.ConvScaleVal * obj.NufftFuncs.SubSamp.^3));
+            %Scale = single(1/(obj.NufftFuncs.ConvScaleVal * obj.NufftFuncs.SubSamp.^3));
+            Scale = single(1/(obj.NufftFuncs.ConvScaleVal * obj.NufftFuncs.SubSamp.^3 * double(obj.NufftFuncs.BaseImageMatrixMemDims(1)).^1.5));
             Data = obj.DataMemPin*Scale;
 
         end
