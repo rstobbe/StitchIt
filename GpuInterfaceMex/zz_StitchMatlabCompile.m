@@ -1,10 +1,10 @@
 function zz_StitchMatlabCompile
 
-CC = '86';
+CC = '75';
 Lib = ['CUDA',CC,'_Library230823_113.lib'];
 
 %CUDApath = getenv('CUDA_PATH_V11_3'); 
-CUDApath = getenv('CUDA_PATH_V12_5');   
+CUDApath = getenv('CUDA_PATH_V12_4');   
 CUDApath = [CUDApath,'\lib\x64'];
 CUDAlib = cd;
 
