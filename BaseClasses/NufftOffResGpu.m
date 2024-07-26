@@ -14,6 +14,52 @@ classdef NufftOffResGpu < NufftGpu
         end        
         
 %% Allocate/Load
+
+%==================================================================
+% AllocateOffResMapGpuMem
+%==================================================================                      
+        function AllocateOffResMapGpuMem(obj)
+            if isempty(obj.BaseImageMatrixMemDims)
+                error('AllocateBaseImageMatricesGpuMem First');
+            end
+            obj.HOffResMap = zeros([1,obj.NumGpuUsed],'uint64');
+            func = str2func(['AllocateRealMatrixAllGpuMem',obj.CompCap]);
+            [obj.HOffResMap(1,:),Error] = func(obj.NumGpuUsed,obj.BaseImageMatrixMemDims);
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end 
+
+%==================================================================
+% LoadDiffOffResonanceMapEachGpu
+%================================================================== 
+        function LoadDiffOffResonanceMapEachGpu(obj,OffResMap)
+            sz = size(OffResMap);
+            if sum(sz(1:3)) ~= sum(obj.BaseImageMatrixMemDims)
+                error('Image dimensionality problem');
+            end
+            if length(sz) == 3
+                if obj.ChanPerGpu * obj.NumGpuUsed ~= 1
+                    error('Image dimensionality problem');
+                end
+            else
+                if sz(4) > (obj.ChanPerGpu * obj.NumGpuUsed)
+                    error('Image dimensionality problem');
+                end
+            end
+            if ~isa(OffResMap,'single')
+                error('Image must be in single format');
+            end         
+            func = str2func(['LoadRealMatrixSingleGpuMemAsync',obj.CompCap]);
+            for m = 1:obj.NumGpuUsed
+                GpuNum = uint64(m-1);
+                [Error] = func(GpuNum,obj.HOffResMap(1,:),OffResMap(:,:,:,m));                  
+                if not(strcmp(Error,'no error'))
+                    error(Error);
+                end
+            end
+        end         
+
 %==================================================================
 % LoadOffResMapGpuMem
 %==================================================================                      

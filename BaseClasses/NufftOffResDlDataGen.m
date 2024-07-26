@@ -65,6 +65,7 @@ classdef NufftOffResDlDataGen < handle
             %--------------------------------------
             % Off Resonance Stuff
             %--------------------------------------
+            obj.NufftFuncs.AllocateOffResMapGpuMem;
             obj.OffResGridArr = AcqInfo.OffResGridArr;
             obj.OffResGridBlockSize = AcqInfo.OffResGridBlockSize;
             obj.OffResLastGridBlockSize = AcqInfo.OffResLastGridBlockSize;
@@ -88,7 +89,7 @@ classdef NufftOffResDlDataGen < handle
 % LoadOffResonanceMap
 %==================================================================        
         function LoadDiffOffResonanceMapEachGpu(obj,OffResMap)
-            obj.NufftFuncs.LoadOffResMapGpuMem(OffResMap);
+            obj.NufftFuncs.LoadDiffOffResonanceMapEachGpu(OffResMap);
         end
 
 %==================================================================
