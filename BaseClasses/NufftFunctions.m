@@ -67,7 +67,9 @@ classdef NufftFunctions < NufftGpu
             % Allocate GPU Memory
             %--------------------------------------
             obj.AllocateKspaceGridImageMatricesGpuMem([Nufft.GridMatrix Nufft.GridMatrix Nufft.GridMatrix]); 
-            obj.AllocateTempMatrixGpuMem([Nufft.TempMatrix Nufft.TempMatrix Nufft.TempMatrix]); 
+            if isprop(Nufft,'TempMatrix')
+                obj.AllocateTempMatrixGpuMem([Nufft.TempMatrix Nufft.TempMatrix Nufft.TempMatrix]);
+            end
             obj.AllocateBaseImageMatricesGpuMem([Nufft.BaseMatrix Nufft.BaseMatrix Nufft.BaseMatrix]);      
             ReconInfoSize = [4 AcqInfo.NumTraj AcqInfo.NumCol];                 % Includes SDC (note, order important for off-res gridding)
             obj.AllocateReconInfoGpuMem(ReconInfoSize);                       

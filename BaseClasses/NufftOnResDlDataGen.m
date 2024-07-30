@@ -95,7 +95,7 @@ classdef NufftOnResDlDataGen < handle
 %==================================================================         
         function Data = Forward(obj)
             
-            obj.NufftFuncs.InitializeGridImageMatricesGpuMem;                              
+            obj.NufftFuncs.InitializeGridMatricesGpuMem;                              
             for m = 1:obj.NumGpuUsed
                 GpuNum = m-1;
                 obj.NufftFuncs.ImageFourierTransformShiftExpandFromBase(GpuNum); 
