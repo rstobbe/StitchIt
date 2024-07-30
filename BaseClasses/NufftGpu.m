@@ -489,7 +489,23 @@ classdef NufftGpu < handle
                 error(Error);
             end
         end        
-        
+
+%==================================================================
+% ImageFourierTransformShiftExpandFromBase
+%==================================================================         
+        function ImageFourierTransformShiftExpandFromBase(obj,GpuNum)
+            if GpuNum > obj.NumGpuUsed-1
+                error('Specified ''GpuNum'' beyond number of GPUs used');
+            end
+            Inset = uint64((obj.GridImageMatrixMemDims(1) - obj.BaseImageMatrixMemDims(1))/2);            
+            GpuNum = uint64(GpuNum);
+            func = str2func(['FourierTransformShiftExpandSingleGpu',obj.CompCap]);
+            [Error] = func(GpuNum,obj.HGridImageMatrix(1,:),obj.HBaseImageMatrix(1,:),obj.GridImageMatrixMemDims,obj.BaseImageMatrixMemDims,Inset);  
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end 
+
 %==================================================================
 % InverseFourierTransform
 %==================================================================         
