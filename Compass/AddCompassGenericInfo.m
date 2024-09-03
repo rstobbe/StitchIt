@@ -20,14 +20,18 @@ function IMG = AddCompassGenericInfo(Image,Name,CreateFunc,PanelOutput,DispType,
     MSTRCT.dispwid = DispWid;
     MSTRCT.ImInfo.pixdim = [1 1 1];
     MSTRCT.ImInfo.vox = 1;
-    MSTRCT.ImInfo.info = [];
+    MSTRCT.ImInfo.info = IMG.ExpDisp;
     MSTRCT.ImInfo.baseorient = 'Axial';             % all images should be oriented axially
     INPUT.Image = IMG.Im;
     INPUT.MSTRCT = MSTRCT;
     IMDISP = ImagingPlotSetup(INPUT);
     IMG.IMDISP = IMDISP;
     IMG.type = 'Image';
-    IMG.path = [];
+    if isprop(CreateFunc,'Path')
+        IMG.path = CreateFunc.Path;
+    else
+        IMG.path = [];
+    end
     IMG.name = ['IMG_',Name];
 end
 
