@@ -1,9 +1,9 @@
 %================================================================
-% NufftOffResDlImageGen
+% NufftOnResDlImageGen
 %   
 %================================================================
 
-classdef NufftOffResDlImageGen < handle
+classdef NufftOnResDlImageGen < handle
 
     properties (SetAccess = private)                                     
         NufftFuncs
@@ -18,9 +18,6 @@ classdef NufftOffResDlImageGen < handle
         DataMemPin
         ImageMemPinBool = 0
         DataMemPinBool = 0
-        OffResGridArr
-        OffResGridBlockSize
-        OffResLastGridBlockSize
         UseSdc = 1
     end
     
@@ -29,8 +26,8 @@ classdef NufftOffResDlImageGen < handle
 %==================================================================
 % Constructor
 %==================================================================   
-        function [obj] = NufftOffResDlImageGen()
-            obj.NufftFuncs = NufftOffResFunctions();
+        function [obj] = NufftOnResDlImageGen()
+            obj.NufftFuncs = NufftFunctions();
         end
 
 %==================================================================
@@ -61,14 +58,6 @@ classdef NufftOffResDlImageGen < handle
             % Nufft Initialize
             %--------------------------------------
             obj.NufftFuncs.Initialize(obj,KernHolder,AcqInfo);  
-            
-            %--------------------------------------
-            % Off Resonance Stuff
-            %--------------------------------------
-            obj.NufftFuncs.AllocateOffResMapGpuMem;
-            obj.OffResGridArr = AcqInfo.OffResGridArr;
-            obj.OffResGridBlockSize = AcqInfo.OffResGridBlockSize;
-            obj.OffResLastGridBlockSize = AcqInfo.OffResLastGridBlockSize;
 
             %--------------------------------------
             % Pin DataMemory
@@ -77,20 +66,6 @@ classdef NufftOffResDlImageGen < handle
             obj.NufftFuncs.RegisterHostComplexMemCuda(obj.ImageMemPin);
             obj.ImageMemPinBool = 1;
         end      
-        
-%==================================================================
-% LoadOffResonanceTimeArr
-%==================================================================        
-        function LoadOffResonanceTimeArr(obj,OffResTimeArr)
-            obj.NufftFuncs.LoadOffResTimeArrGpuMem(OffResTimeArr);
-        end
-
-%==================================================================
-% LoadOffResonanceMap
-%==================================================================        
-        function LoadDiffOffResonanceMapEachGpu(obj,OffResMap)
-            obj.NufftFuncs.LoadDiffOffResonanceMapEachGpu(OffResMap);
-        end
 
 %==================================================================
 % Inverse
@@ -103,33 +78,23 @@ classdef NufftOffResDlImageGen < handle
                 GpuNum = m-1;
                 obj.NufftFuncs.LoadSampDatGpuMemAsyncCidx(GpuNum,Data,m);
             end
-            obj.NufftFuncs.InitializeBaseMatricesGpuMem;
-            for r = 1:length(obj.OffResGridArr)
-                obj.NufftFuncs.InitializeGridMatricesGpuMem;
-                for m = 1:obj.NumGpuUsed
-                    GpuNum = m-1;
-                    if r < length(obj.OffResGridArr) 
-                        obj.NufftFuncs.GridSampDatSubset(GpuNum,obj.OffResGridArr(r),obj.OffResGridBlockSize);      
-                    elseif r == length(obj.OffResGridArr) 
-                        obj.NufftFuncs.GridSampDatSubset(GpuNum,obj.OffResGridArr(r),obj.OffResLastGridBlockSize);
-                    end
-                end
-                for m = 1:obj.NumGpuUsed
-                    GpuNum = m-1;
-                    obj.NufftFuncs.KspaceFourierTransformShift(GpuNum); 
-                end
-                for m = 1:obj.NumGpuUsed
-                    GpuNum = m-1;
-                    obj.NufftFuncs.InverseFourierTransform(GpuNum);
-                end
-                for m = 1:obj.NumGpuUsed
-                    GpuNum = m-1;
-                    obj.NufftFuncs.ImageFourierTransformShiftReduceToTemp(GpuNum); 
-                end
-                for m = 1:obj.NumGpuUsed
-                    GpuNum = m-1;
-                    obj.NufftFuncs.AccumBaseImagesWithConjPhase(GpuNum,r);
-                end
+            
+            obj.NufftFuncs.InitializeGridMatricesGpuMem;
+            for m = 1:obj.NumGpuUsed
+                GpuNum = m-1;
+                obj.NufftFuncs.GridSampDat(GpuNum);
+            end
+            for m = 1:obj.NumGpuUsed
+                GpuNum = m-1;
+                obj.NufftFuncs.KspaceFourierTransformShift(GpuNum); 
+            end
+            for m = 1:obj.NumGpuUsed
+                GpuNum = m-1;
+                obj.NufftFuncs.InverseFourierTransform(GpuNum);
+            end
+            for m = 1:obj.NumGpuUsed
+                GpuNum = m-1;
+                obj.NufftFuncs.ImageFourierTransformShiftReduce(GpuNum); 
             end
             for m = 1:obj.NumGpuUsed
                 GpuNum = m-1;
