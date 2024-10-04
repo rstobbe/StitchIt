@@ -19,7 +19,8 @@ properties (SetAccess = private)
     ResetGpus = 1
     DispStatObj
     LowGpuRamCase = 0
-    IntensityCorrection = 1
+    IntensityCorrection = 0
+    ObjectAtIso = 1
 end
 
 methods 
@@ -82,10 +83,14 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     %% RxProfs
     ReconObj.DispStatObj.Status('RxProfs',2);
     ReconObj.DispStatObj.Status('Load Data',3);
-    if ReconObj.UseExternalShift
-        Data = DataObj0.ReturnDataSetWithExternalShift(ReconObj.AcqInfoRxp,[],ReconObj.Shift);
+    if ReconObj.ObjectAtIso
+        Data = DataObj0.ReturnDataSet(ReconObj.AcqInfoRxp,[]);
     else
-        Data = DataObj0.ReturnDataSetWithShift(ReconObj.AcqInfoRxp,[]);
+        if ReconObj.UseExternalShift
+            Data = DataObj0.ReturnDataSetWithExternalShift(ReconObj.AcqInfoRxp,[],ReconObj.Shift);
+        else
+            Data = DataObj0.ReturnDataSetWithShift(ReconObj.AcqInfoRxp,[]);
+        end
     end
     ReconObj.DispStatObj.Status('Initialize',3);
     StitchIt = StitchItReturnRxProfs();
@@ -100,10 +105,14 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     if ReconObj.IntensityCorrection
         ReconObj.DispStatObj.Status('Intensity Correction',2);
         ReconObj.DispStatObj.Status('Load Data',3);
-        if ReconObj.UseExternalShift
-            Data = DataObjArr{1}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
+        if ReconObj.ObjectAtIso
+            Data = DataObjArr{1}.DataObj.ReturnDataSet(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber);
         else
-            Data = DataObjArr{1}.DataObj.ReturnDataSetWithShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber);
+            if ReconObj.UseExternalShift
+                Data = DataObjArr{1}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
+            else
+                Data = DataObjArr{1}.DataObj.ReturnDataSetWithShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber);
+            end
         end
         ReconObj.DispStatObj.Status('Initialize',3);
         StitchIt = StitchItNufftV1a();
@@ -156,10 +165,14 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     for n = 1:length(DataObjArr)
         ReconObj.DispStatObj.Status(['Nufft Recon ',num2str(n)],2);
         ReconObj.DispStatObj.Status('Load Data',3);
-        if ReconObj.UseExternalShift
-            Data = DataObjArr{n}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
+        if ReconObj.ObjectAtIso
+            Data = DataObjArr{n}.DataObj.ReturnDataSet(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber);
         else
-            Data = DataObjArr{n}.DataObj.ReturnDataSetWithShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber);
+            if ReconObj.UseExternalShift
+                Data = DataObjArr{n}.DataObj.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber,ReconObj.Shift);
+            else
+                Data = DataObjArr{n}.DataObj.ReturnDataSetWithShift(ReconObj.AcqInfo{ReconObj.ReconNumber},ReconObj.ReconNumber);
+            end
         end
         Data = DataObjArr{n}.DataObj.ScaleData(StitchIt,Data);
         ReconObj.DispStatObj.Status('Generate',3);
@@ -187,9 +200,6 @@ end
 function SetAcqInfoRxp(ReconObj,val)    
     ReconObj.AcqInfoRxp = val;
 end
-function SetAcqInfoOffRes(ReconObj,val)    
-    ReconObj.AcqInfoOffRes = val;
-end
 function SetReconNumber(ReconObj,val)    
     ReconObj.ReconNumber = val;
 end
@@ -211,6 +221,9 @@ function SetIntensityCorrection(ReconObj,val)
 end
 function SetUseExternalShift(ReconObj,val)    
     ReconObj.UseExternalShift = val;
+end
+function SetObjectAtIso(ReconObj,val)    
+    ReconObj.ObjectAtIso = val;
 end
 function SetDisplayRxProfs(ReconObj,val)    
     ReconObj.DispStatObj.SetDisplayRxProfs(val);

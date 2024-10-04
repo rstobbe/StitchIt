@@ -29,6 +29,9 @@ properties (SetAccess = private)
     OffResLastGridBlockSize
     TrajsInSet
     Type                        % 1 = scan / 2 = offresmap
+    NumAverages = 1
+    TrajLocInAve
+    TrajLocAllAcq
 end
 
 methods 
@@ -113,6 +116,15 @@ function SetTrajsInSet(STCH,val)
 end
 function SetTypeOffResMap(STCH)     
     STCH.Type = 2;
+end
+function SetNumAverages(STCH,val)     
+    STCH.NumAverages = val;
+end
+function SetTrajLocInAve(STCH,val)     
+    STCH.TrajLocInAve = val;
+end
+function SetTrajLocAllAcq(STCH,val)     
+    STCH.TrajLocAllAcq = val;
 end
 
 end

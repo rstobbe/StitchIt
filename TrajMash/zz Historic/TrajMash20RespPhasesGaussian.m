@@ -5,6 +5,15 @@
 
 function TrajMashInfo = TrajMash20RespPhasesGaussian(k0,MetaData)
 
+startSkip = 2000; 
+
+DispFigs = 1;
+if DispFigs
+    figure(1001); hold on; 
+    plot(startSkip:length(k0),abs(k0(startSkip:end,1))); 
+    %plot(1:length(k0)-startSkip+1,abs(k0(startSkip:end,2))); 
+end
+
 %------------------------------------------------
 % Drop Zeros
 %------------------------------------------------
@@ -16,7 +25,6 @@ NumAcqs = MetaData.NumAverages * MetaData.NumTraj;
 %------------------------------------------------
 % Filter
 %------------------------------------------------
-startSkip = 2000; 
 Fst1 = 0.025;
 Fp1 = 0.05;
 Fp2 = 0.5;
@@ -37,6 +45,12 @@ for i = 1:nCoil
     y5 = flip(y4);
     range(i) = max(y5((startSkip+1):end)) - min(y5((startSkip+1):end));                         
     y6(startSkip:end,i) = y5(startSkip:end)';
+end
+
+if DispFigs
+    figure(1002); hold on; 
+    plot(1:length(k0),y6(:,1)); 
+    plot(1:length(k0),y6(:,2)); 
 end
 
 %------------------------------------------------
@@ -93,7 +107,10 @@ NavSig = T2;
 %------------------------------------------------
 peaks = peakfinder(NavSig);
 peaks_diff = diff(peaks);
-%figure(10001); hold on; plot(NavSig); plot(T1); plot(peaks,NavSig(peaks),'ro')
+if DispFigs
+    %figure(10001); hold on; plot(NavSig); plot(T1); plot(peaks,NavSig(peaks),'ro')
+    figure(10001); hold on; plot(NavSig); plot(peaks,NavSig(peaks),'ro')
+end
 
 RespPhaseOfAcq = zeros(1,NumAcqs);
 for j = 1:length(peaks_diff)
@@ -102,7 +119,9 @@ for j = 1:length(peaks_diff)
 end
 RespPhaseOfAcq(1:startSkip) = -1;
 RespPhaseOfAcq(end:NumAcqs) = -1;
-%figure(10002); hold on; plot(RespPhaseOfAcq); 
+if DispFigs
+    figure(10002); hold on; plot(RespPhaseOfAcq);
+end
 
 RespPhaseImages = (0:0.05:0.95);
 NumImages = length(RespPhaseImages);
@@ -130,8 +149,8 @@ TrajMashInfo.WeightArr = single(NormWeightArr);
 TrajMashInfo.NavSig=single(NavSig);
 TrajMashInfo.Time=single(TR/1000*[1:length(NavSig)]);
 
-% figure(4576457); hold on;
-% plot(NormWeightArrSeqTest(:,1));
-% plot(NormWeightArrSeqTest(:,2));
-% Test = 0;
+figure(4576457); hold on;
+plot(NormWeightArrSeqTest(:,1));
+plot(NormWeightArrSeqTest(:,2));
+Test = 0;
 
