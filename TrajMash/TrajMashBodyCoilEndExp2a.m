@@ -11,7 +11,7 @@ properties (SetAccess = private)
     StartSkip = 2000            % Trajectories to skip (steady-state)
     DispFigs = 1                % 0 = no figures; 1 = basic; 2 = verbose
     AtExpirationFrac = 0.25     % The 'fraction of the respiration cycle' included as expiration  
-    PeakFindSensitivity = 3
+    PeakFindSensitivity = 5
     UseCoil = 1
     % ----------
     DispStatObj
