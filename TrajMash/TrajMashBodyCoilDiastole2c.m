@@ -1,12 +1,12 @@
 %==================================================================
-% (V2b)
+% (V2c)
 %   - 
 %==================================================================
 
-classdef TrajMashBodyCoilEndExp2b < handle
+classdef TrajMashBodyCoilDiastole2c < handle
 
 properties (SetAccess = private)                   
-    Method = 'TrajMashBodyCoilEndExp2b'
+    Method = 'TrajMashBodyCoilDiastole2c'
     % Selectable
     StartSkip = 2000            % Trajectories to skip (steady-state)
     DispFigs = 1                % 0 = no figures; 1 = basic; 2 = verbose
@@ -48,7 +48,7 @@ methods
 %==================================================================
 % Constructor
 %==================================================================  
-function TrajMashObj = TrajMashBodyCoilEndExp2b()              
+function TrajMashObj = TrajMashBodyCoilDiastole2c()              
     TrajMashObj.DispStatObj = DisplayStatusObject();
 end
 
@@ -108,7 +108,7 @@ function CreateNavigatorWaveform(TrajMashObj,k0,DataObj,ReconObj)
     %------------------------------------------------
     % Initial Navigator
     %------------------------------------------------
-    TrajMashObj.FilterTime = 1000;          % starting filter time
+    TrajMashObj.FilterTime = 200;          % starting filter time
     TrajMashObj.Filter;
     TrajMashObj.PeakFinder;
     if TrajMashObj.DispFigs > 1
@@ -121,7 +121,7 @@ function CreateNavigatorWaveform(TrajMashObj,k0,DataObj,ReconObj)
     %------------------------------------------------
     PeaksDiff = diff(TrajMashObj.Peaks);
     TrajMashObj.MedianPeaksDiff = median(PeaksDiff);
-    TrajMashObj.FilterTime = TrajMashObj.MedianPeaksDiff*TrajMashObj.TR/2;
+    TrajMashObj.FilterTime = TrajMashObj.MedianPeaksDiff*TrajMashObj.TR/3;
     TrajMashObj.Filter;
     TrajMashObj.PeakFinder;
     if TrajMashObj.DispFigs > 0
@@ -178,7 +178,7 @@ function PeakFinder(TrajMashObj)
         Sel = (max(TrajMashObj.NavSig)-min(TrajMashObj.NavSig))/560;
     end
     TrajMashObj.Peaks = peakfinder(TrajMashObj.NavSig,Sel);
-    if TrajMashObj.Peaks(1) < TrajMashObj.StartSkip
+    if TrajMashObj.Peaks(1) <= TrajMashObj.StartSkip
         TrajMashObj.Peaks = TrajMashObj.Peaks(2:end);
     end
 end
@@ -193,7 +193,7 @@ function DetermineTraj2Use(TrajMashObj)
     %------------------------------------------------
     % Determine RiseFall Duration
     %------------------------------------------------
-    TrajMashObj.RiseFallDur = 2500;
+    TrajMashObj.RiseFallDur = 4000;
     while true
         RiseFallRespPts = round(TrajMashObj.RiseFallDur/TrajMashObj.TR);
         TrajMashObj.ExpInds = zeros(TrajMashObj.NumAcqs,1);
@@ -214,10 +214,16 @@ function DetermineTraj2Use(TrajMashObj)
     %------------------------------------------------
     ShiftPctArr = -0.3:0.001:0.3;
     for n = 2:length(TrajMashObj.Peaks)
+        Test = [];
         for m = 1:length(ShiftPctArr)
             Shift(m) = round(RespPts * ShiftPctArr(m));
             TrajMashObj.ExpInds = zeros(TrajMashObj.NumAcqs,1);
             TrajMashObj.ExpInds(Shift(m)+(TrajMashObj.Peaks(n-1)+RiseFallRespPts:TrajMashObj.Peaks(n)-RiseFallRespPts)) = 1;
+            if length(TrajMashObj.ExpInds) > length(TrajMashObj.NavSig)
+                TrajMashObj.ExpInds = TrajMashObj.ExpInds(1:length(TrajMashObj.NavSig));
+                Test(m) = 1e9;
+                break
+            end
             Test(m) = sum(TrajMashObj.NavSig(logical(TrajMashObj.ExpInds)));
         end
         if Test(m) == 0

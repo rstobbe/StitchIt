@@ -2,7 +2,7 @@
 % AddCompassGenericInfo
 %================================================================== 
 
-function IMG = AddCompassGenericInfo(Image,Name,CreateFunc,PanelOutput,DispType,DispWid)
+function IMG = AddCompassGenericInfo(Image,Name,CreateFunc,PanelOutput,DispType,DispWid,PixDim,Vox)
 
     IMG.Method = class(CreateFunc);
     IMG.Im = Image;  
@@ -18,8 +18,10 @@ function IMG = AddCompassGenericInfo(Image,Name,CreateFunc,PanelOutput,DispType,
     %----------------------------------------------
     MSTRCT.type = DispType;
     MSTRCT.dispwid = DispWid;
-    MSTRCT.ImInfo.pixdim = [1 1 1];
-    MSTRCT.ImInfo.vox = 1;
+    % MSTRCT.ImInfo.pixdim = [1 1 1];
+    % MSTRCT.ImInfo.vox = 1;
+    MSTRCT.ImInfo.pixdim = PixDim;
+    MSTRCT.ImInfo.vox = Vox;
     MSTRCT.ImInfo.info = IMG.ExpDisp;
     MSTRCT.ImInfo.baseorient = 'Axial';             % all images should be oriented axially
     INPUT.Image = IMG.Im;

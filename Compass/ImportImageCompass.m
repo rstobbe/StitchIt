@@ -59,7 +59,7 @@ function totgblnum = ImportImageCompass(Image,Name,Save,Path,DispWid)
     %----------------------------------------------
     if Save == 1
         saveData.IMG = IMG;
-        save([IMG.path,IMG.name],'saveData');
+        save(fullfile(IMG.path,IMG.name),'saveData');
     end
     
 end

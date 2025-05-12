@@ -114,7 +114,14 @@ classdef SimulationStitchItDataObject < handle
         function Data = ReturnDataSetWithShift(obj,AcqInfo,ReconNumber)
             Data = obj.DataFull{ReconNumber};
         end
-        
+
+%==================================================================
+% ReturnDataSetWithNoShift
+%================================================================== 
+        function Data = ReturnDataSetWithNoShift(obj,AcqInfo,ReconNumber)
+            Data = obj.DataFull{ReconNumber};
+        end
+
 %==================================================================
 % ReturnDataSet
 %================================================================== 

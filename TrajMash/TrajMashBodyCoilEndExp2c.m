@@ -1,12 +1,12 @@
 %==================================================================
-% (V2b)
-%   - 
+% (V2c)
+%   - Make initial RiseFallDur longer to accomodate slow breathing
 %==================================================================
 
-classdef TrajMashBodyCoilEndExp2b < handle
+classdef TrajMashBodyCoilEndExp2c < handle
 
 properties (SetAccess = private)                   
-    Method = 'TrajMashBodyCoilEndExp2b'
+    Method = 'TrajMashBodyCoilEndExp2c'
     % Selectable
     StartSkip = 2000            % Trajectories to skip (steady-state)
     DispFigs = 1                % 0 = no figures; 1 = basic; 2 = verbose
@@ -48,7 +48,7 @@ methods
 %==================================================================
 % Constructor
 %==================================================================  
-function TrajMashObj = TrajMashBodyCoilEndExp2b()              
+function TrajMashObj = TrajMashBodyCoilEndExp2c()              
     TrajMashObj.DispStatObj = DisplayStatusObject();
 end
 
@@ -178,7 +178,7 @@ function PeakFinder(TrajMashObj)
         Sel = (max(TrajMashObj.NavSig)-min(TrajMashObj.NavSig))/560;
     end
     TrajMashObj.Peaks = peakfinder(TrajMashObj.NavSig,Sel);
-    if TrajMashObj.Peaks(1) < TrajMashObj.StartSkip
+    if TrajMashObj.Peaks(1) <= TrajMashObj.StartSkip
         TrajMashObj.Peaks = TrajMashObj.Peaks(2:end);
     end
 end
@@ -193,7 +193,7 @@ function DetermineTraj2Use(TrajMashObj)
     %------------------------------------------------
     % Determine RiseFall Duration
     %------------------------------------------------
-    TrajMashObj.RiseFallDur = 2500;
+    TrajMashObj.RiseFallDur = 4000;
     while true
         RiseFallRespPts = round(TrajMashObj.RiseFallDur/TrajMashObj.TR);
         TrajMashObj.ExpInds = zeros(TrajMashObj.NumAcqs,1);
@@ -214,10 +214,16 @@ function DetermineTraj2Use(TrajMashObj)
     %------------------------------------------------
     ShiftPctArr = -0.3:0.001:0.3;
     for n = 2:length(TrajMashObj.Peaks)
+        Test = [];
         for m = 1:length(ShiftPctArr)
             Shift(m) = round(RespPts * ShiftPctArr(m));
             TrajMashObj.ExpInds = zeros(TrajMashObj.NumAcqs,1);
             TrajMashObj.ExpInds(Shift(m)+(TrajMashObj.Peaks(n-1)+RiseFallRespPts:TrajMashObj.Peaks(n)-RiseFallRespPts)) = 1;
+            if length(TrajMashObj.ExpInds) > length(TrajMashObj.NavSig)
+                TrajMashObj.ExpInds = TrajMashObj.ExpInds(1:length(TrajMashObj.NavSig));
+                Test(m) = 1e9;
+                break
+            end
             Test(m) = sum(TrajMashObj.NavSig(logical(TrajMashObj.ExpInds)));
         end
         if Test(m) == 0

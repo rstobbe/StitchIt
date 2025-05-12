@@ -2,7 +2,7 @@
 % ReturnOneImage
 %================================================================== 
 
-function IMG = AddCompassMapInfo(Image,DataObj,AcqInfo,StitchIt,ReconPanelOutput,NameSuffix)
+function IMG = AddCompassMapInfo(Image,DataObj,AcqInfo,StitchIt,ReconPanelOutput,NameSuffix,DispWid)
 
     IMG.Method = class(StitchIt);
     IMG.Im = Image;  
@@ -22,7 +22,8 @@ function IMG = AddCompassMapInfo(Image,DataObj,AcqInfo,StitchIt,ReconPanelOutput
     sz = size(Image);
     PixDims = AcqInfo.Fov./sz(1:3);
     MSTRCT.type = 'map';
-    MSTRCT.dispwid = [-max(abs(IMG.Im(:))) max(abs(IMG.Im(:)))];
+    % MSTRCT.dispwid = [-max(abs(IMG.Im(:))) max(abs(IMG.Im(:)))];
+    MSTRCT.dispwid = DispWid;
     MSTRCT.ImInfo.pixdim = PixDims;
     MSTRCT.ImInfo.vox = PixDims(1)*PixDims(2)*PixDims(3);
     MSTRCT.ImInfo.info = IMG.ExpDisp;

@@ -36,6 +36,7 @@ end
 % CreateImage
 %==================================================================  
 function [Image,err] = CreateImage(ReconObj,DataObjArr)     
+    Image = [];
     %% Status Display
     %ReconObj.DispStatObj.StatusClear();
     ReconObj.DispStatObj.Status('ReconNufft',1);
@@ -60,6 +61,22 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     if ReconObj.ReconNumber > length(ReconObj.AcqInfo)
         err.flag = 1;
         err.msg = 'ReconNumber beyond length Recon_File';
+        return
+    end
+
+    %% Steady-State Test
+    SteadyStateTest = 0;
+    if SteadyStateTest == 1
+        FirstDataPoints0 = DataObj0.ReturnFirstDataPointEachTraj(ReconObj.AcqInfo{1});
+        NumFlips = DataObj0.DataInfo.ExpPars.Sequence.numflips;
+        Dummies = ReconObj.AcqInfo{1}.Dummies;
+        NumTraj = ReconObj.AcqInfo{1}.NumTraj;
+        NumAverages = ReconObj.AcqInfo{1}.NumAverages;
+        TrajPerFlip = (NumTraj + Dummies) * NumAverages;
+        figure(1234);
+        plot(mean(abs(FirstDataPoints0),2));
+        err.flag = 3;
+        err.msg = 'SteadyStateTest';
         return
     end
 

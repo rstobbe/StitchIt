@@ -2,10 +2,17 @@
 % SaveImageCompass
 %================================================================== 
 
-function SaveImageCompass(Image,Name,Path)
+function SaveImageCompass(Image,Name,Path,AcqInfo)
 
     IMG.Im = Image;  
     IMG.ExpPars = [];
+
+    if nargin < 4
+        PixDims = [1 1 1];
+    else
+        sz = size(Image);
+        PixDims = AcqInfo.Fov./sz(1:3);
+    end
 
     Panel(1,:) = {'','','Output'};
     Panel(2,:) = {'Generic',[],'Output'};
@@ -18,8 +25,8 @@ function SaveImageCompass(Image,Name,Path)
     %----------------------------------------------
     MSTRCT.type = 'abs';
     MSTRCT.dispwid = [0 max(abs(IMG.Im(:)))];
-    MSTRCT.ImInfo.pixdim = [1 1 1];
-    MSTRCT.ImInfo.vox = 1;
+    MSTRCT.ImInfo.pixdim = PixDims;
+    MSTRCT.ImInfo.vox = PixDims(1)*PixDims(2)*PixDims(3);
     MSTRCT.ImInfo.info = [];
     MSTRCT.ImInfo.baseorient = 'Axial';             % all images should be oriented axially
     INPUT.Image = IMG.Im;
