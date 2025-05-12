@@ -20,8 +20,8 @@ properties (SetAccess = private)
     DispStatObj
     ObjectAtIso = 1
     ReturnType = 0
-    DoSaveSmallerFov = 1;
-    SaveSmallerFov = [400 400 200];   
+    DoSaveSmallerFov = 0;
+    SaveSmallerFov = [400 400 400];   
     TrajMashfunc
     TrajMashIpt
 end
@@ -77,13 +77,11 @@ function [Image,err] = CreateImage(ReconObj,DataObj)
         NumTraj = ReconObj.AcqInfo{1}.NumTraj;
         TrajPerImage = NumTraj + Dummies;
         figure(1234); hold on;
-        plot((1:TrajPerImage),mean(abs(FirstDataPoints0),2),'b');
+        plot((1:TrajPerImage*NumImages),mean(abs(FirstDataPoints0),2),'b');
         for n = 1:NumImages
             plot(TrajPerImage*(n-1)+Dummies+(1:NumTraj),mean(abs(FirstDataPoints0(TrajPerImage*(n-1)+Dummies+(1:NumTraj),:)),2),'r');         
         end
     end
-
-
 
     %% Load Data
     ReconObj.DispStatObj.Status('Load Data',2);
@@ -100,7 +98,7 @@ function [Image,err] = CreateImage(ReconObj,DataObj)
     sz = size(DataFull);
     YfpData = zeros(NumTraj,sz(2),sz(3),NumImages,'single');
     for n = 1:NumImages
-        YfpData(:,:,:,n) = DataFull(TrajPerImage*(n-1)+Dummies+1:TrajPerImage*n,:,:);
+        YfpData(:,:,:,n) = DataFull(TrajPerImage*(n-1)+Dummies+(1:NumTraj),:,:);
     end
     YfpDataRxProf = YfpData(:,1:ReconObj.AcqInfoRxp.NumCol,:,1);          % Use first image (doesn't matter - it gets 'divided out' anyway)
 
