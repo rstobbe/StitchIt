@@ -1,12 +1,12 @@
 %==================================================================
-% (V2c)
-%   - Make initial RiseFallDur longer to accomodate slow breathing
+% (V3a)
+%   
 %==================================================================
 
-classdef TrajMashBodyCoilEndExp2c < handle
+classdef TrajMashLung3a < handle
 
 properties (SetAccess = private)                   
-    Method = 'TrajMashBodyCoilEndExp2c'
+    Method = 'TrajMashLung3a'
     % Selectable
     StartSkip = 2000            % Trajectories to skip (steady-state)
     DispFigs = 1                % 0 = no figures; 1 = basic; 2 = verbose
@@ -48,7 +48,7 @@ methods
 %==================================================================
 % Constructor
 %==================================================================  
-function TrajMashObj = TrajMashBodyCoilEndExp2c()              
+function TrajMashObj = TrajMashLung3a()              
     TrajMashObj.DispStatObj = DisplayStatusObject();
 end
 
@@ -65,6 +65,7 @@ function CreateNavigatorWaveform(TrajMashObj,k0,DataObj,ReconObj)
     TrajMashObj.NumAcqs = TrajMashObj.NumTraj*TrajMashObj.NumAverages;
     TrajMashObj.TrajLocAllAcq = single(ReconObj.TrajLocAllAcq);
     TrajMashObj.TR = DataObj.DataInfo.ExpPars.Sequence.tr;
+    TrajMashObj.NumCoils = size(k0,2);
 
     %------------------------------------------------
     % Test
@@ -74,34 +75,16 @@ function CreateNavigatorWaveform(TrajMashObj,k0,DataObj,ReconObj)
     end
 
     %------------------------------------------------
-    % FindBestCoil
-    %  (does not work for 2 good navigators with opposite information)
+    % Start
     %------------------------------------------------
-    % if TrajMashObj.FindBestCoil 
-    %     TrajMashObj.k0 = abs(k0(:,1)); 
-    %     TrajMashObj.FilterTime = 1000;          
-    %     TrajMashObj.Filter;
-    %     TrajMashObj.PlotNavigator(10001);
-    %     Test1 = peak2rms(TrajMashObj.NavSig);
-    %     TrajMashObj.k0 = abs(k0(:,2)); 
-    %     TrajMashObj.FilterTime = 1000;          
-    %     TrajMashObj.Filter;
-    %     Test2 = peak2rms(TrajMashObj.NavSig);
-    %     TrajMashObj.PlotNavigator(10001);
-    %     if Test1 > Test2
-    %         TrajMashObj.CallingFunction = 1;
-    %     else
-    %         TrajMashObj.CallingFunction = 2;
-    %     end
-    % end
-    TrajMashObj.k0 = abs(k0(:,TrajMashObj.UseCoil));
+    TrajMashObj.k0 = abs(k0);
 
     %------------------------------------------------
     % Starting Figure
     %------------------------------------------------
     if TrajMashObj.DispFigs > 1
         figure(1001); hold on; 
-        plot(TrajMashObj.StartSkip:length(k0),TrajMashObj.k0(TrajMashObj.StartSkip:end,1)); 
+        plot(TrajMashObj.StartSkip:length(k0),TrajMashObj.k0(TrajMashObj.StartSkip:end,:)); 
         title('Centre of k-Space Data')
     end
     
@@ -152,11 +135,15 @@ end
 %================================================================== 
 function Filter(TrajMashObj)
     TrajMashObj.FilterSpan = round(TrajMashObj.FilterTime/TrajMashObj.TR);
-    TrajMashObj.NavSig = abs(smooth(TrajMashObj.k0,TrajMashObj.FilterSpan,'lowess'));
-    TrajMashObj.NavSig(1:TrajMashObj.StartSkip-1) = 0;
-    TrajMashObj.NavSig = single(TrajMashObj.NavSig);
+    TrajMashObj.NavSig = zeros(size(TrajMashObj.k0));
+    for n = 1:TrajMashObj.NumCoils
+        TrajMashObj.NavSig(:,n) = abs(smooth(TrajMashObj.k0(:,n),TrajMashObj.FilterSpan,'lowess'));
+        TrajMashObj.NavSig(1:TrajMashObj.StartSkip-1,n) = 0;
+    end
+    PcaNavSig = pca(TrajMashObj.NavSig.');
+    TrajMashObj.NavSig = single(PcaNavSig(:,1));
     if TrajMashObj.Flip
-        TrajMashObj.NavSig = 100 - TrajMashObj.NavSig;
+        TrajMashObj.NavSig = max(TrajMashObj.NavSig)*10 - TrajMashObj.NavSig;
     end
 end
 
