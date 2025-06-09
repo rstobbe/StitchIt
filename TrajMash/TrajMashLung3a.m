@@ -163,6 +163,10 @@ function PeakFinder(TrajMashObj)
         Sel = (max(TrajMashObj.NavSig)-min(TrajMashObj.NavSig))/400;
     elseif TrajMashObj.PeakFindSensitivity == 6 
         Sel = (max(TrajMashObj.NavSig)-min(TrajMashObj.NavSig))/560;
+    elseif TrajMashObj.PeakFindSensitivity == 7 
+        Sel = (max(TrajMashObj.NavSig)-min(TrajMashObj.NavSig))/800;
+    elseif TrajMashObj.PeakFindSensitivity == 8 
+        Sel = (max(TrajMashObj.NavSig)-min(TrajMashObj.NavSig))/1130;
     end
     TrajMashObj.Peaks = peakfinder(TrajMashObj.NavSig,Sel);
     if TrajMashObj.Peaks(1) <= TrajMashObj.StartSkip
