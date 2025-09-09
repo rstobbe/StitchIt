@@ -20,10 +20,11 @@ properties (SetAccess = private)
     DispStatObj
     ObjectAtIso = 1
     ReturnType = 0
-    DoSaveSmallerFov = 0;
+    DoSaveSmallerFov = 0
     SaveSmallerFov = [400 400 400];   
     TrajMashfunc
     TrajMashIpt
+    SteadyStateTest = 1
 end
 
 methods 
@@ -68,20 +69,28 @@ function [Image,err] = CreateImage(ReconObj,DataObj)
         return
     end
 
+    %% Info
+    NumImages = DataObj.DataInfo.ExpPars.Sequence.NumImages;
+    Dummies = DataObj.DataInfo.ExpPars.Sequence.Dummies;
+    NumTraj = ReconObj.AcqInfo{1}.NumTraj;
+    TrajPerImage = NumTraj + Dummies;    
+
     %% Test
-    SteadyStateTest = 1;
-    if SteadyStateTest
+    if ReconObj.SteadyStateTest
         FirstDataPoints0 = DataObj.ReturnFirstDataPointEachTraj(ReconObj.AcqInfo{1});
-        NumImages = DataObj.DataInfo.ExpPars.Sequence.NumImages;
-        Dummies = DataObj.DataInfo.ExpPars.Sequence.Dummies;
-        NumTraj = ReconObj.AcqInfo{1}.NumTraj;
-        TrajPerImage = NumTraj + Dummies;
         figure(1234); hold on;
         plot((1:TrajPerImage*NumImages),mean(abs(FirstDataPoints0),2),'b');
         for n = 1:NumImages
             plot(TrajPerImage*(n-1)+Dummies+(1:NumTraj),mean(abs(FirstDataPoints0(TrajPerImage*(n-1)+Dummies+(1:NumTraj),:)),2),'r');         
         end
     end
+    DataPreSamp = DataObj.ReturnPreSampDataPlusTen(ReconObj.AcqInfo{1},1);
+    MeanDataPreSamp = squeeze(mean(DataPreSamp,1));
+    figure(2345); hold on;
+    plot([ReconObj.AcqInfo{1}.SampStart ReconObj.AcqInfo{1}.SampStart],[-1 1],'k:')
+    plot(abs(MeanDataPreSamp(:,1)),'k');
+    plot(real(DataPreSamp(1,:,1)),'r');
+    plot(imag(DataPreSamp(1,:,1)),'b');
 
     %% Load Data
     ReconObj.DispStatObj.Status('Load Data',2);
@@ -96,11 +105,18 @@ function [Image,err] = CreateImage(ReconObj,DataObj)
     end
 
     sz = size(DataFull);
+    if length(sz) == 2
+        sz(3) = 1;
+    end
     YfpData = zeros(NumTraj,sz(2),sz(3),NumImages,'single');
     for n = 1:NumImages
         YfpData(:,:,:,n) = DataFull(TrajPerImage*(n-1)+Dummies+(1:NumTraj),:,:);
     end
     YfpDataRxProf = YfpData(:,1:ReconObj.AcqInfoRxp.NumCol,:,1);          % Use first image (doesn't matter - it gets 'divided out' anyway)
+
+    % MeanData = squeeze(mean(YfpData,1));
+    % figure(2346); hold on;
+    % plot(abs(YfpData(98,:,10,1)));
 
     %% Reset GPUs
     if ReconObj.ResetGpus
@@ -124,7 +140,7 @@ function [Image,err] = CreateImage(ReconObj,DataObj)
     ReconObj.DispStatObj.Status('Initialize',3);
     StitchIt = StitchItReturnRxProfs();
     StitchIt.Initialize(KernHolder,ReconObj.AcqInfoRxp);
-    YfpDataRxProf = DataObj.ScaleData(StitchIt,YfpDataRxProf);
+    YfpDataRxProf = DataObj.ScaleData(KernHolder,YfpDataRxProf);
     ReconObj.DispStatObj.Status('Generate',3);
     RxProfs = StitchIt.CreateImage(YfpDataRxProf);
     %--

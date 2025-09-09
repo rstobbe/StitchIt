@@ -289,6 +289,23 @@ classdef NufftOffResGpu < NufftGpu
         end                        
 
 %==================================================================
+% PhaseAddFatOffResonance
+%==================================================================                      
+        function PhaseAddFatOffResonance(obj,GpuNum,OffResTimNum)
+            if GpuNum > obj.NumGpuUsed-1
+                error('Specified ''GpuNum'' beyond number of GPUs used');
+            end
+            GpuNum = uint64(GpuNum);
+            OffResTimNum = uint64(OffResTimNum-1);
+            func = str2func(['PhaseAddFatOffResonance',obj.CompCap]);
+            [Error] = func(GpuNum,obj.HBaseImageMatrix(1,:),obj.HOffResMap(1,:),obj.HTempMatrix(1,:),obj.HOffResTimeArr(1,:),...
+                                    OffResTimNum,obj.BaseImageMatrixMemDims);
+            if not(strcmp(Error,'no error'))
+                error(Error);
+            end
+        end  
+
+%==================================================================
 % GridSampDatSubset
 %==================================================================                      
         function GridSampDatSubset(obj,GpuNum,SampStart,SampBlock)

@@ -59,6 +59,7 @@ classdef NufftReturnChannels < handle
                 GridMemory = (obj.GridMatrix^3)*28;          % k-space + image + temp + invfilt (complex & single)
                 BaseImageMemory = 0;
                 obj.Fov2ReturnGridMatrix = 1;
+                obj.BaseMatrix = KernHolder.BaseMatrix;
             else
                 obj.BaseMatrix = KernHolder.BaseMatrix;
                 GridMemory = (obj.GridMatrix^3)*16;          % k-space + image (complex & single)

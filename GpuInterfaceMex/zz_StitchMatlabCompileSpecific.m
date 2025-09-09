@@ -1,13 +1,13 @@
 function zz_StitchMatlabCompileSpecific
 
 CC = '61';
-Lib = ['CUDA',CC,'_Library230823_113.lib'];
+Lib = ['CUDA',CC,'_Library250704_124.lib'];
 
-CUDApath = getenv('CUDA_PATH_V11_3');      
+CUDApath = getenv('CUDA_PATH');   
 CUDApath = [CUDApath,'\lib\x64'];
 CUDAlib = cd;
 
-File = 'TeardownFourierTransformPlanAllGpu.cpp';
+File = 'PhaseAddFatOffResonance.cpp';
 
 [Path,Name,Ext] = fileparts(File);
 if not(strcmp(Ext,'.cpp'))

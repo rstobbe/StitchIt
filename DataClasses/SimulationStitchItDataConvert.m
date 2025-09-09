@@ -50,7 +50,8 @@ classdef SimulationStitchItDataConvert < handle
             obj.DataPath = [];
             obj.DataName = [];
             
-            obj.DataInfo.ExpPars = '';
+            obj.DataInfo.ExpPars.Sequence.NumImages = 1;
+            obj.DataInfo.ExpPars.Sequence.Dummies = 0;
             obj.DataInfo.ExpDisp = '';
             obj.DataInfo.PanelOutput = [];
             obj.DataInfo.Seq = 'Simulation';
@@ -83,8 +84,15 @@ classdef SimulationStitchItDataConvert < handle
 %================================================================== 
         function Data = ReturnDataSet(obj,AcqInfo,ReconNumber)  
             Data = obj.DataFull{ReconNumber};
-        end        
-        
+        end     
+
+%==================================================================
+% ReturnAllData
+%================================================================== 
+        function Data = ReturnAllData(obj,AcqInfo,ReconNumber)  
+            Data = obj.DataFull{ReconNumber};
+        end 
+
             
     end
 end
