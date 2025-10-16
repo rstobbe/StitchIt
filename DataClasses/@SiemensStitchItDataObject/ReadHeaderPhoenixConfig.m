@@ -19,7 +19,7 @@ function [prot] = ReadHeaderPhoenixConfig(DATA,fid)
         bufname(end)   = []; % delete NULL character
         buflen         = fread(fid, 1,'uint32');
         buffer         = fread(fid, buflen, 'char=>char').';
-        if strcmp(bufname,'Phoenix') || strcmp(bufname,'Config')
+        if strcmp(bufname,'Phoenix') || strcmp(bufname,'Config') || strcmp(bufname,'Meas') || strcmp(bufname,'Dicom') || strcmp(bufname,'MeasYaps') || strcmp(bufname,'Spice')
             buffer         = regexprep(buffer,'\n\s*\n',''); % delete empty lines
             prot.(bufname) = parse_buffer(buffer);
         end

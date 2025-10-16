@@ -18,7 +18,8 @@ test2 = sWipMemBlock.adFree;
 fov = num2str(test1{21});
 vox = num2str(round(test1{22}*test1{23}*test1{24}/1e8));
 voxarr = [test1{22} test1{23} test1{24}];
-ind = find(voxarr == max(voxarr),1,'first');
+% ind = find(voxarr == max(voxarr),1,'first');
+ind = 3;
 if ind == 1
     elip = num2str(100*test1{23}/test1{22});
 elseif ind == 2
@@ -103,6 +104,41 @@ end
 % Slab Direction
 %---------------------------------------------
 ExpPars.Sequence.slabdir = 'z';
+
+%--------------------------------------------
+% Other Parameters
+%--------------------------------------------
+% ShimVals = cell(1,9);
+% ShimVals{1} = MrProt.sGRADSPEC.asGPAData{1}.lOffsetX;
+% ShimVals{2} = MrProt.sGRADSPEC.asGPAData{1}.lOffsetY;
+% ShimVals{3} = MrProt.sGRADSPEC.asGPAData{1}.lOffsetZ;
+% ShimVals0 = [];
+% if isfield(MrProt.sGRADSPEC,'alShimCurrent')
+%     ShimVals0 = MrProt.sGRADSPEC.alShimCurrent;
+% end
+% ShimVals(4:3+length(ShimVals0)) = ShimVals0;
+% Freq = MrProt.sTXSPEC.asNucleusInfo{1}.lFrequency;
+% Ref = MrProt.sProtConsistencyInfo.flNominalB0 * 42577000;
+% tof = Freq - Ref;
+% ShimVals(9) = {tof};
+% ShimNames = {'x','y','z','z2','zx','zy','x2y2','xy','tof'};
+% % ShimValsUI{1} = ShimVals{1}/6.259;
+% % ShimValsUI{2} = ShimVals{2}/6.2465;
+% % ShimValsUI{3} = ShimVals{3}/6.108;
+% % ShimValsUI{4} = ShimVals{4}/2.016;
+% % ShimValsUI{5} = ShimVals{5}/2.815;
+% % ShimValsUI{6} = ShimVals{6}/2.853;
+% % ShimValsUI{7} = ShimVals{7}/2.815;
+% % ShimValsUI{8} = ShimVals{8}/2.866;
+% ShimValsUI{1} = ShimVals{1}/6.2587;
+% ShimValsUI{2} = ShimVals{2}/6.2463;
+% ShimValsUI{3} = ShimVals{3}/6.1081;
+% ShimValsUI{4} = ShimVals{4}/2.0146;
+% ShimValsUI{5} = ShimVals{5}/2.7273;
+% ShimValsUI{6} = ShimVals{6}/2.8389;
+% ShimValsUI{7} = ShimVals{7}/2.8049;
+% ShimValsUI{8} = ShimVals{8}/2.7928;
+% ShimValsUI{9} = ShimVals{9}
 
 %--------------------------------------------
 % Panel

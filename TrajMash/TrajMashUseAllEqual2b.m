@@ -3,7 +3,8 @@
 %   - Match TrajMashBodyCoilEndExp2b
 %==================================================================
 
-classdef TrajMashUseAllEqual2b < handle
+% classdef TrajMashUseAllEqual2b < handle
+classdef TrajMashUseAllEqual2b < matlab.mixin.Copyable
 
 properties (SetAccess = private)                   
     Method = 'TrajMashUseAllEqual2b'

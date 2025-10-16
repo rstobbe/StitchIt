@@ -36,7 +36,7 @@ end
 function [Image,err] = CreateImage(ReconObj,DataObjArr)     
     %% Status Display
     %ReconObj.DispStatObj.StatusClear();
-    ReconObj.DispStatObj.Status('ReconNufftRetChanV1a',1);
+    ReconObj.DispStatObj.Status('ReconNufftRetChanV1b',1);
     
     %% Test  
     DataObj0 = DataObjArr{1}.DataObj;
@@ -60,6 +60,32 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
         err.msg = 'ReconNumber beyond length Recon_File';
         return
     end
+
+    %% Info
+    % NumImages = DataObj0.DataInfo.ExpPars.Sequence.NumImages;
+    NumImages = 1;
+    if not(isfield(DataObj0.DataInfo.ExpPars.Sequence,'Dummies'))
+        Dummies = 0;
+    else
+        Dummies = DataObj0.DataInfo.ExpPars.Sequence.Dummies;
+    end
+    NumTraj = ReconObj.AcqInfo{1}.NumTraj;
+    TrajPerImage = NumTraj + Dummies;    
+
+    %% Test
+    FirstDataPoints0 = DataObj0.ReturnFirstDataPointEachTraj(ReconObj.AcqInfo{1});
+    figure(1234); hold on;
+    plot((1:TrajPerImage*NumImages),mean(abs(FirstDataPoints0),2),'b');
+    for n = 1:NumImages
+        plot(TrajPerImage*(n-1)+Dummies+(1:NumTraj),mean(abs(FirstDataPoints0(TrajPerImage*(n-1)+Dummies+(1:NumTraj),:)),2),'r');         
+    end
+    DataPreSamp = DataObj0.ReturnPreSampDataPlusTen(ReconObj.AcqInfo{1},1);
+    MeanDataPreSamp = squeeze(mean(DataPreSamp,1));
+    figure(2345); hold on;
+    plot([ReconObj.AcqInfo{1}.SampStart ReconObj.AcqInfo{1}.SampStart],[-1 1],'k:')
+    plot(abs(MeanDataPreSamp(1,:,1)),'k');
+    plot(real(DataPreSamp(1,:,1)),'r');
+    plot(imag(DataPreSamp(1,:,1)),'b');
 
     %% Reset GPUs
     if ReconObj.ResetGpus
