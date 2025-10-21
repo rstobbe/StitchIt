@@ -29,18 +29,22 @@ ExpPars.TrajImpName = ExpPars.TrajName;
 %---------------------------------------------
 % Sequence Info
 %---------------------------------------------
-ExpPars.scantime = MrProt.lTotalScanTimeSec;
-for n = 1:length(MrProt.adFlipAngleDegree)    
-    if (isempty(MrProt.adFlipAngleDegree{n}))
-        break;
+for n = 1:4
+    if isempty(test1{25+n})
+        ExpPars.Sequence.NumImages = n-1;
+        break
     else
-        ExpPars.Sequence.flip(n) = MrProt.adFlipAngleDegree{n};
-        ExpPars.Sequence.rfpulselen(n) = test1{11+n};
-        ExpPars.Sequence.tr(n) = MrProt.alTR{n}/1e3; 
-        ExpPars.Sequence.te(n) = MrProt.alTE{n}/1e3; 
+        ExpPars.Sequence.Seq(n) = test1{25+n};
     end
 end
-ExpPars.Sequence.NumImages = length(ExpPars.Sequence.flip);
+
+ExpPars.scantime = MrProt.lTotalScanTimeSec;
+for n = 1:ExpPars.Sequence.NumImages   
+    ExpPars.Sequence.flip(n) = MrProt.adFlipAngleDegree{n};
+    ExpPars.Sequence.rfpulselen(n) = test1{11+n};
+    ExpPars.Sequence.tr(n) = MrProt.alTR{n}/1e3; 
+    ExpPars.Sequence.te(n) = MrProt.alTE{n}/1e3; 
+end
 ExpPars.rcvrs = DataInfo.NCha;
 
 %---------------------------------------------
@@ -62,11 +66,6 @@ ExpPars.Sequence.RfSatRec = test1{22};
 ExpPars.Sequence.RfSatIntv = test1{23};
 ExpPars.Sequence.Dummies = test1{24};
 ExpPars.Sequence.SarScale = test1{25};
-ExpPars.Sequence.GradPreStart = test1{26};
-ExpPars.Sequence.Seq(1) = test1{26};
-ExpPars.Sequence.Seq(2) = test1{27};
-ExpPars.Sequence.Seq(3) = test1{28};
-ExpPars.Sequence.Seq(4) = test1{29};
 
 %---------------------------------------------
 % Testing Info

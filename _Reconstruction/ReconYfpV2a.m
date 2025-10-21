@@ -72,12 +72,15 @@ function [Image,err] = CreateImage(ReconObj,DataObj)
     %% Info
     NumImages = DataObj.DataInfo.ExpPars.Sequence.NumImages;
     Dummies = DataObj.DataInfo.ExpPars.Sequence.Dummies;
+    NumRcvrs = DataObj.DataInfo.ExpPars.rcvrs;
     NumTraj = ReconObj.AcqInfo{1}.NumTraj;
     TrajPerImage = NumTraj + Dummies;    
 
     %% Test
     if ReconObj.SteadyStateTest
-        FirstDataPoints0 = DataObj.ReturnFirstDataPointEachTraj(ReconObj.AcqInfo{1});
+        FirstDataPoints0 = zeros(TrajPerImage*NumImages,NumRcvrs,'like',single(1+1i));
+        FirstDataPointsTemp = DataObj.ReturnFirstDataPointEachTraj(ReconObj.AcqInfo{1});
+        FirstDataPoints0(1:length(FirstDataPointsTemp),:) = FirstDataPointsTemp;                              % hack for missing data points at the end.  
         figure(1234); hold on;
         plot((1:TrajPerImage*NumImages),mean(abs(FirstDataPoints0),2),'b');
         for n = 1:NumImages
@@ -94,15 +97,18 @@ function [Image,err] = CreateImage(ReconObj,DataObj)
 
     %% Load Data
     ReconObj.DispStatObj.Status('Load Data',2);
+    DataFull = zeros(TrajPerImage*NumImages,ReconObj.AcqInfo{1}.NumCol,NumRcvrs,'like',single(1+1i));
     if ReconObj.ObjectAtIso
-        DataFull = DataObj.ReturnAllData(ReconObj.AcqInfo{1},1);
+        DataFullTemp = DataObj.ReturnAllData(ReconObj.AcqInfo{1},1);
     else
         if ReconObj.UseExternalShift
-            DataFull = DataObj.ReturnAllAveragedDataWithExternalShift(ReconObj.AcqInfo{1},1,ReconObj.Shift);
+            DataFullTemp = DataObj.ReturnAllAveragedDataWithExternalShift(ReconObj.AcqInfo{1},1,ReconObj.Shift);
         else
-            DataFull = DataObj.ReturnAllAveragedDataWithShift(ReconObj.AcqInfo{1},1);
+            DataFullTemp = DataObj.ReturnAllAveragedDataWithShift(ReconObj.AcqInfo{1},1);
         end
     end
+    sz = size(DataFullTemp);
+    DataFull(1:sz(1),:,:) = DataFullTemp;
 
     sz = size(DataFull);
     if length(sz) == 2
