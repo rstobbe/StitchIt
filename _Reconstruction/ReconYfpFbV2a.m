@@ -41,6 +41,7 @@ end
 function [Image,err] = CreateImage(ReconObj,DataObj)     
     %% Status Display
     %ReconObj.DispStatObj.StatusClear();
+    Image = [];
     ReconObj.DispStatObj.Status('ReconYfpFbV2a',1);
     
     %% Test  
@@ -115,6 +116,17 @@ function [Image,err] = CreateImage(ReconObj,DataObj)
         TrajMashObjArray(n).CreateNavigatorWaveform(FirstDataPoints(:,:,n));
         TrajMashObjArray(n).WeightTrajectories();
         NumRespPhases = TrajMashObjArray(n).NumImages;
+    end
+    answer = questdlg('TrajMash Right (point at top)?');
+    switch answer
+        case 'No'
+            err.flag = 1;
+            err.msg = 'Fix TrajMash';
+            return
+        case 'Cancel'
+            err.flag = 1;
+            err.msg = 'Fix TrajMash';
+            return
     end
 
     %% Load Data
