@@ -38,17 +38,8 @@ for n = 1:4
     end
 end
 
-ExpPars.scantime = MrProt.lTotalScanTimeSec;
-for n = 1:ExpPars.Sequence.NumImages   
-    ExpPars.Sequence.flip(n) = MrProt.adFlipAngleDegree{n};
-    ExpPars.Sequence.rfpulselen(n) = test1{11+n};
-    ExpPars.Sequence.tr(n) = MrProt.alTR{n}/1e3; 
-    ExpPars.Sequence.te(n) = MrProt.alTE{n}/1e3; 
-end
-ExpPars.rcvrs = DataInfo.NCha;
-
 %---------------------------------------------
-% Other Info
+% Info
 %---------------------------------------------
 ExpPars.Sequence.rdwn = test1{16};
 if isempty(ExpPars.Sequence.rdwn)
@@ -66,6 +57,23 @@ ExpPars.Sequence.RfSatRec = test1{22};
 ExpPars.Sequence.RfSatIntv = test1{23};
 ExpPars.Sequence.Dummies = test1{24};
 ExpPars.Sequence.SarScale = test1{25};
+
+%---------------------------------------------
+% Info
+%---------------------------------------------
+ExpPars.scantime = MrProt.lTotalScanTimeSec;
+for n = 1:ExpPars.Sequence.NumImages   
+    ExpPars.Sequence.flip(n) = MrProt.adFlipAngleDegree{n};
+    ExpPars.Sequence.rfpulselen(n) = test1{11+n};
+    ExpPars.Sequence.tr(n) = MrProt.alTR{n}/1e3; 
+    ExpPars.Sequence.te(n) = MrProt.alTE{n}/1e3;
+    if ExpPars.Sequence.Seq(n) == 2
+        ExpPars.Sequence.trnav(n) = (ExpPars.Sequence.tr(n)*ExpPars.Sequence.RfSatIntv + ExpPars.Sequence.RfSatRec/1000)/ExpPars.Sequence.RfSatIntv;
+    else
+        ExpPars.Sequence.trnav(n) = ExpPars.Sequence.tr(n);
+    end
+end
+ExpPars.rcvrs = DataInfo.NCha;
 
 %---------------------------------------------
 % Testing Info
@@ -148,10 +156,13 @@ m = m+1;
 Panel(m,:) = {'GradMag (mT/m)',ExpPars.Sequence.GradMag,'Output'};
 m = m+1;
 Panel(m,:) = {'GradSlewRate (mT/m/ms)',ExpPars.Sequence.GradSlewRate,'Output'};
-% m = m+1;
-% Panel(m,:) = {'RfSatRecovery (us)',ExpPars.Sequence.RfSatRec,'Output'};
-% m = m+1;
-% Panel(m,:) = {'RfSatIntv (us)',ExpPars.Sequence.RfSatIntv,'Output'};
+ind = find(ExpPars.Sequence.Seq == 2, 1);
+if not(isempty(ind))
+    m = m+1;
+    Panel(m,:) = {'RfSatRecovery (us)',ExpPars.Sequence.RfSatRec,'Output'};
+    m = m+1;
+    Panel(m,:) = {'RfSatIntv (us)',ExpPars.Sequence.RfSatIntv,'Output'};
+end
 m = m+1;
 Panel(m,:) = {'Dummies',ExpPars.Sequence.Dummies,'Output'};
 

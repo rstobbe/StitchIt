@@ -85,6 +85,14 @@ function [Image,err] = CreateImage(ReconObj,DataObj)
     for n = 1:NumImages
         FirstDataPoints(:,:,n) = FirstDataPoints0(TrajPerImagePlusDummies*(n-1)+Dummies+(1:TrajPerImage),:);
     end
+    DataPreSamp = DataObj.ReturnPreSampDataPlusTwenty(ReconObj.AcqInfo{1},1);
+    MeanDataPreSamp = squeeze(mean(DataPreSamp,1));
+    figure(2345); hold on;
+    plot([ReconObj.AcqInfo{1}.SampStart ReconObj.AcqInfo{1}.SampStart],[-1 1],'k:')
+    plot(abs(MeanDataPreSamp(:,1)),'k');
+    plot(real(DataPreSamp(1,:,1)),'r');
+    plot(imag(DataPreSamp(1,:,1)),'b');
+    clear DataPreSamp
 
     %% Test
     if ReconObj.SteadyStateTest
@@ -103,7 +111,7 @@ function [Image,err] = CreateImage(ReconObj,DataObj)
         TrajMashObjArray(n).SetNumTraj(ReconObj.AcqInfo{1}.NumTraj);
         TrajMashObjArray(n).SetNumAverages(ReconObj.AcqInfo{1}.NumAverages);
         TrajMashObjArray(n).SetTrajLocAllAcq(ReconObj.AcqInfo{1}.TrajLocAllAcq);
-        TrajMashObjArray(n).SetTr(DataObj.DataInfo.ExpPars.Sequence.tr(n));
+        TrajMashObjArray(n).SetTr(DataObj.DataInfo.ExpPars.Sequence.trnav(n));
         TrajMashObjArray(n).CreateNavigatorWaveform(FirstDataPoints(:,:,n));
         TrajMashObjArray(n).WeightTrajectories();
         NumRespPhases = TrajMashObjArray(n).NumImages;
@@ -123,10 +131,12 @@ function [Image,err] = CreateImage(ReconObj,DataObj)
     end
     sz = size(DataFullTemp);
     DataFull(1:sz(1),:,:) = DataFullTemp;
+    clear DataFullTemp;
     YfpData = zeros(TrajPerImage,ReconObj.AcqInfo{1}.NumCol,NumRcvrs,NumImages,'like',single(1+1i));
     for n = 1:NumImages
         YfpData(:,:,:,n) = DataFull(TrajPerImagePlusDummies*(n-1)+Dummies+(1:TrajPerImage),:,:);
     end
+    clear DataFull;
 
     %% Reset GPUs
     if ReconObj.ResetGpus
@@ -158,9 +168,19 @@ function [Image,err] = CreateImage(ReconObj,DataObj)
     ReconObj.DispStatObj.Status('Generate',3);
     RxProfs = StitchIt.CreateImage(YfpDataRxProf);
     %--
-    ReconObj.DispStatObj.SetDisplayRxProfs(1);
+    %ReconObj.DispStatObj.SetDisplayRxProfs(1);
     %--
-    ReconObj.DispStatObj.TestDisplayRxProfs(RxProfs);
+    if ReconObj.DoSaveSmallerFov
+        Fov = ReconObj.AcqInfoRxp.Fov;
+        for n = 1:3
+            Sz(n) = 2*round(((ReconObj.SaveSmallerFov(n)/Fov)*ReconObj.BaseMatrix)/2);
+            Start(n) = (ReconObj.BaseMatrix - Sz(n))/2; 
+            Stop(n) = Start(n) + Sz(n) - 1;
+        end
+        ReconObj.DispStatObj.TestDisplayRxProfs(RxProfs(Start(1):Stop(1),Start(2):Stop(2),Start(3):Stop(3),:));
+    else
+        ReconObj.DispStatObj.TestDisplayRxProfs(RxProfs);
+    end
     clear('StitchIt','YfpDataRxProf');
 
     %% Image

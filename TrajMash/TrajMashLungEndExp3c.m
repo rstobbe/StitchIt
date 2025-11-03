@@ -3,16 +3,18 @@
 %   - Info set using functions
 %==================================================================
 
-classdef TrajMashLungMultiPhase3c < matlab.mixin.Copyable
+classdef TrajMashLungEndExp3c < matlab.mixin.Copyable
 
 properties (SetAccess = private)                   
-    Method = 'TrajMashLungMultiPhase3c'
+    Method = 'TrajMashLungEndExp3c'
     % Selectable
     StartSkip = 2000            % Trajectories to skip (steady-state)
     DispFigs = 1                % 0 = no figures; 1 = basic; 2 = verbose
+    AtExpirationFrac = 0.25     % The 'fraction of the respiration cycle' included as expiration  
     PeakFindSensitivity = 5
-    AcceptanceLevel = 1
+    UseCoil = 1
     Flip = 0
+    FindBestCoil = 0
     % ----------
     DispStatObj
     NumTraj
@@ -31,7 +33,6 @@ properties (SetAccess = private)
     MedianPeaksDiff
     k0
     Peaks
-    NumPeaks
     ExpInds
     PeriExpInds
     SumWeightOut
@@ -39,7 +40,7 @@ properties (SetAccess = private)
     PeriShiftPct
     RiseFallDur
     FilterTime
-    Phases
+    AtExpirationPeriFrac
     TrajMashNum
 end
 
@@ -48,7 +49,7 @@ methods
 %==================================================================
 % Constructor
 %==================================================================  
-function TrajMashObj = TrajMashLungMultiPhase3c()              
+function TrajMashObj = TrajMashLungEndExp3c()              
     TrajMashObj.DispStatObj = DisplayStatusObject();
 end
 
@@ -136,8 +137,11 @@ function Filter(TrajMashObj)
         TrajMashObj.NavSig(1:TrajMashObj.StartSkip-1,n) = 0;
     end
     PcaNavSig = pca(TrajMashObj.NavSig.');
-    % TrajMashObj.NavSig = single(PcaNavSig(:,1));
-    TrajMashObj.NavSig = single(PcaNavSig(:,2));
+    if size(PcaNavSig,2) == 1
+        TrajMashObj.NavSig = PcaNavSig;
+    else
+        TrajMashObj.NavSig = single(PcaNavSig(:,2));
+    end
     if TrajMashObj.Flip
         TrajMashObj.NavSig = max(TrajMashObj.NavSig)*10 - TrajMashObj.NavSig;
     end
@@ -176,65 +180,132 @@ end
 %==================================================================  
 function DetermineTraj2Use(TrajMashObj)
     PeaksDiff = diff(TrajMashObj.Peaks);
-    obj.NumPeaks = length(TrajMashObj.Peaks);
+    RespPts = median(PeaksDiff);
 
-    V = TrajMashObj.AcceptanceLevel;
+    %------------------------------------------------
+    % Determine RiseFall Duration
+    %------------------------------------------------
+    TrajMashObj.RiseFallDur = 4000;
+    while true
+        RiseFallRespPts = round(TrajMashObj.RiseFallDur/TrajMashObj.TR);
+        TrajMashObj.ExpInds = zeros(TrajMashObj.NumAcqs,1);
+        for n = 2:length(TrajMashObj.Peaks)
+            TrajMashObj.ExpInds(TrajMashObj.Peaks(n-1)+RiseFallRespPts:TrajMashObj.Peaks(n)-RiseFallRespPts) = 1;
+        end
+        TrajUsedFrac = sum(TrajMashObj.ExpInds)/TrajMashObj.NumAcqs;
+        if TrajUsedFrac > TrajMashObj.AtExpirationFrac
+            break
+        end
+        TrajMashObj.RiseFallDur = TrajMashObj.RiseFallDur - 25;
+    end
+    RiseFallRespPts = round(TrajMashObj.RiseFallDur/TrajMashObj.TR);
+    PeriRiseFallRespPts = round(RiseFallRespPts/1.5);
 
-    TrajMashObj.ExpInds = zeros(TrajMashObj.NumAcqs,TrajMashObj.Phases);
-    TrajMashObj.PeriExpInds = zeros(TrajMashObj.NumAcqs,TrajMashObj.Phases);
-    for p = 1:TrajMashObj.Phases
-        for n = 1:(obj.NumPeaks-1)
-            TrajMashObj.ExpInds(TrajMashObj.Peaks(n) + ((round((p-1)*PeaksDiff(n)/TrajMashObj.Phases)):round(p*PeaksDiff(n)/TrajMashObj.Phases)),p) = 1;
-            if p == 1
-                if n == 1
-                    TrajMashObj.PeriExpInds(TrajMashObj.Peaks(n) + ((round((p-1-V)*PeaksDiff(n)/TrajMashObj.Phases)):round((p-1)*PeaksDiff(n)/TrajMashObj.Phases)),p) = 1;
-                else
-                    TrajMashObj.PeriExpInds(TrajMashObj.Peaks(n) + ((round((p-1-V)*PeaksDiff(n-1)/TrajMashObj.Phases)):round((p-1)*PeaksDiff(n-1)/TrajMashObj.Phases)),p) = 1;
-                end
-            else
-                TrajMashObj.PeriExpInds(TrajMashObj.Peaks(n) + ((round((p-1-V)*PeaksDiff(n)/TrajMashObj.Phases)):round((p-1)*PeaksDiff(n)/TrajMashObj.Phases)),p) = 1;
+    %------------------------------------------------
+    % Determine location of end expiration
+    %------------------------------------------------
+    ShiftPctArr = -0.3:0.001:0.3;
+    for n = 2:length(TrajMashObj.Peaks)
+        Test = [];
+        for m = 1:length(ShiftPctArr)
+            Shift(m) = round(RespPts * ShiftPctArr(m));
+            TrajMashObj.ExpInds = zeros(TrajMashObj.NumAcqs,1);
+            TrajMashObj.ExpInds(Shift(m)+(TrajMashObj.Peaks(n-1)+RiseFallRespPts:TrajMashObj.Peaks(n)-RiseFallRespPts)) = 1;
+            if length(TrajMashObj.ExpInds) > length(TrajMashObj.NavSig)
+                TrajMashObj.ExpInds = TrajMashObj.ExpInds(1:length(TrajMashObj.NavSig));
+                Test(m) = 1e9;
+                break
             end
-            TrajMashObj.PeriExpInds(TrajMashObj.Peaks(n) + ((round(p*PeaksDiff(n)/TrajMashObj.Phases)):round((p+V)*PeaksDiff(n)/TrajMashObj.Phases)),p) = 1;
+            Test(m) = sum(TrajMashObj.NavSig(logical(TrajMashObj.ExpInds)));
+        end
+        if Test(m) == 0
+            TrajMashObj.ShiftPct(n) = 0;
+        else
+            ind = find(Test == min(Test),1);
+            TrajMashObj.ShiftPct(n) = ShiftPctArr(ind);
         end
     end
+
+    %------------------------------------------------
+    % Determine optimum peri-expiration
+    %------------------------------------------------
+    ShiftPctArr = -0.3:0.001:0.3;
+    for n = 2:length(TrajMashObj.Peaks)
+        for m = 1:length(ShiftPctArr)
+            PeriShift(m) = round(RespPts * ShiftPctArr(m));
+            Shift = round(RespPts * TrajMashObj.ShiftPct(n));
+            TrajMashObj.PeriExpInds = zeros(TrajMashObj.NumAcqs,1);
+            TrajMashObj.PeriExpInds(PeriShift(m)+TrajMashObj.Peaks(n-1)+PeriRiseFallRespPts:Shift+TrajMashObj.Peaks(n-1)+RiseFallRespPts-1) = 1;
+            TrajMashObj.PeriExpInds(Shift+TrajMashObj.Peaks(n)-RiseFallRespPts+1:PeriShift(m)+TrajMashObj.Peaks(n)-PeriRiseFallRespPts) = 1;
+            if length(TrajMashObj.PeriExpInds) > TrajMashObj.NumAcqs
+                TrajMashObj.PeriExpInds = TrajMashObj.PeriExpInds(1:TrajMashObj.NumAcqs);
+            end
+            Test(m) = sum(TrajMashObj.NavSig(logical(TrajMashObj.PeriExpInds)));
+        end
+        if Test(m) == 0
+            TrajMashObj.PeriShiftPct(n) = 0;
+        else
+            ind = find(Test == min(Test),1);
+            TrajMashObj.PeriShiftPct(n) = ShiftPctArr(ind);
+        end
+    end
+
+    TrajMashObj.ExpInds = zeros(TrajMashObj.NumAcqs,1);
+    TrajMashObj.PeriExpInds = zeros(TrajMashObj.NumAcqs,1);
+    for n = 2:length(TrajMashObj.Peaks)
+        Shift = round(RespPts * TrajMashObj.ShiftPct(n));
+        TrajMashObj.ExpInds(Shift+(TrajMashObj.Peaks(n-1)+RiseFallRespPts:TrajMashObj.Peaks(n)-RiseFallRespPts)) = 1;
+        PeriShift = round(RespPts * TrajMashObj.PeriShiftPct(n));
+        TrajMashObj.PeriExpInds(PeriShift+TrajMashObj.Peaks(n-1)+PeriRiseFallRespPts:Shift+TrajMashObj.Peaks(n-1)+RiseFallRespPts-1) = 1;
+        TrajMashObj.PeriExpInds(Shift+TrajMashObj.Peaks(n)-RiseFallRespPts+1:PeriShift+TrajMashObj.Peaks(n)-PeriRiseFallRespPts) = 1;
+        if length(TrajMashObj.PeriExpInds) > TrajMashObj.NumAcqs
+            TrajMashObj.PeriExpInds = TrajMashObj.PeriExpInds(1:TrajMashObj.NumAcqs);
+        end
+    end
+    TrajMashObj.AtExpirationFrac = sum(TrajMashObj.ExpInds)/TrajMashObj.NumAcqs;
+    TrajMashObj.AtExpirationPeriFrac = sum(TrajMashObj.PeriExpInds)/TrajMashObj.NumAcqs;
 end
 
 %==================================================================
 % WeightTrajectories
 %==================================================================  
 function WeightTrajectories(TrajMashObj)
-    Holes = zeros(1,TrajMashObj.Phases);
-    PeriVals = zeros(1,TrajMashObj.Phases);
-    for p = 1:TrajMashObj.Phases
-        for n = 1:TrajMashObj.NumTraj
-            Weight(n,:,p) = TrajMashObj.ExpInds(TrajMashObj.TrajLocAllAcq(n,:),p);
-            SumWeight(n,p) = sum(Weight(n,:,p),2);
-            if SumWeight(n,p) == 0
-                PeriVals(p) = PeriVals(p) + 1;
-                Weight(n,:,p) = TrajMashObj.PeriExpInds(TrajMashObj.TrajLocAllAcq(n,:),p);
-                SumWeight(n,p) = sum(Weight(n,:,p),2);
-            end
-            if SumWeight(n,p) == 0
-                Holes(p) = Holes(p) + 1;
-                Weight(n,:,p) = ones(1,TrajMashObj.NumAverages);
-                SumWeight(n,p) = sum(Weight(n,:,p),2);
-            end
-            NormWeight(n,:,p) = Weight(n,:,p)/SumWeight(n,p);
+    Holes = 0;
+    PeriVals = 0;
+    for n = 1:TrajMashObj.NumTraj
+        % -- TestTraj1
+        % if n == 1                                             
+        %     figure(2001); hold on; 
+        %     plot(TrajMashObj.TrajLocAllAcq(n,:),TrajMashObj.NavSig(TrajMashObj.TrajLocAllAcq(n,:)),'k*');
+        % end
+        % --
+        Weight(n,:) = TrajMashObj.ExpInds(TrajMashObj.TrajLocAllAcq(n,:));
+        SumWeight(n) = sum(Weight(n,:),2);
+        if SumWeight(n) == 0
+            PeriVals = PeriVals + 1;
+            Weight(n,:) = TrajMashObj.PeriExpInds(TrajMashObj.TrajLocAllAcq(n,:));
+            SumWeight(n) = sum(Weight(n,:),2);
         end
+        if SumWeight(n) == 0
+            Holes = Holes + 1;
+            Weight(n,:) = ones(1,TrajMashObj.NumAverages);
+            SumWeight(n) = sum(Weight(n,:),2);
+        end
+        NormWeight(n,:) = Weight(n,:)/SumWeight(n);
     end
     TrajMashObj.SumWeightOut = SumWeight;
     TrajMashObj.PeriValsFraction = PeriVals/TrajMashObj.NumTraj;
     TrajMashObj.HoleFraction = Holes/TrajMashObj.NumTraj;
-    TrajMashObj.MeanTrajsUsed = mean(SumWeight,1);
+    TrajMashObj.MeanTrajsUsed = mean(SumWeight);
     TrajMashObj.WeightArr = single(NormWeight);
-    TrajMashObj.NumImages = TrajMashObj.Phases;
+    TrajMashObj.NumImages = 1;
 end
 
 %==================================================================
 % PlotNavigator
 %================================================================== 
 function PlotNavigator(TrajMashObj,FigureNumber)
-    figure(FigureNumber); clf; hold on; 
+    figure(FigureNumber); hold on; 
     plot(TrajMashObj.StartSkip:length(TrajMashObj.NavSig),TrajMashObj.NavSig(TrajMashObj.StartSkip:end));
     plot(TrajMashObj.Peaks,TrajMashObj.NavSig(TrajMashObj.Peaks),'o')
     title('Navigator');
@@ -246,8 +317,8 @@ end
 function PlotUsedTrajs(TrajMashObj,FigureNumber)
     figure(FigureNumber); hold on; 
     AcqsArr = 1:TrajMashObj.NumAcqs;
-    plot(AcqsArr(logical(TrajMashObj.ExpInds(:,1))),TrajMashObj.NavSig(logical(TrajMashObj.ExpInds(:,1))),'r*')
-    plot(AcqsArr(logical(TrajMashObj.PeriExpInds(:,1))),TrajMashObj.NavSig(logical(TrajMashObj.PeriExpInds(:,1))),'g*')
+    plot(AcqsArr(logical(TrajMashObj.ExpInds)),TrajMashObj.NavSig(logical(TrajMashObj.ExpInds)),'r*')
+    plot(AcqsArr(logical(TrajMashObj.PeriExpInds)),TrajMashObj.NavSig(logical(TrajMashObj.PeriExpInds)),'g*')
     title('Navigator');
 end
 
@@ -255,7 +326,10 @@ end
 % DoTrajMash
 %==================================================================  
 function DataMash = DoTrajMash(TrajMashObj,Data,nim)
-    DataMash = DoTrajMashV2(Data,TrajMashObj.WeightArr(:,:,nim),TrajMashObj.TrajLocAllAcq);
+    if nim > 1
+        error('This TrajMash only makes one image');
+    end
+    DataMash = DoTrajMashV2(Data,TrajMashObj.WeightArr,TrajMashObj.TrajLocAllAcq);
 end
 
 %==================================================================
@@ -267,17 +341,17 @@ end
 function SetDispFigs(TrajMashObj,val)
     TrajMashObj.DispFigs = val;
 end
+function SetAtExpirationFrac(TrajMashObj,val)
+    TrajMashObj.AtExpirationFrac = val;
+end
 function SetPeakFindSensitivity(TrajMashObj,val)
     TrajMashObj.PeakFindSensitivity = val;
 end
+function SetUseCoil(TrajMashObj,val)
+    TrajMashObj.UseCoil = val;
+end
 function SetFlip(TrajMashObj,val)
     TrajMashObj.Flip = val;
-end
-function SetPhases(TrajMashObj,val)
-    TrajMashObj.Phases = val;
-end
-function SetAcceptanceLevel(TrajMashObj,val)
-    TrajMashObj.AcceptanceLevel = val;
 end
 function SetNumTraj(TrajMashObj,val)
     TrajMashObj.NumTraj = val;

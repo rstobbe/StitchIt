@@ -100,7 +100,7 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     ReconObj.DispStatObj.Status('RxProfs',2);
     ReconObj.DispStatObj.Status('Load Data',3);
     if ReconObj.ObjectAtIso
-        Data = DataObj0.ReturnYafi2Data(ReconObj.AcqInfoRxp,[]);
+        Data = DataObj0.ReturnYafi2Data(ReconObj.AcqInfoRxp);
     else
         % if ReconObj.UseExternalShift
         %     Data = DataObj0.ReturnDataSetWithExternalShift(ReconObj.AcqInfoRxp,[],ReconObj.Shift);
@@ -128,7 +128,7 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     Image = zeros([ReconObj.BaseMatrix,ReconObj.BaseMatrix,ReconObj.BaseMatrix,1,length(DataObjArr),3],'like',single(1+1i));
     ReconObj.DispStatObj.Status('Load Data',3);
     if ReconObj.ObjectAtIso
-        Data = DataObj0.ReturnYafi2Data(ReconObj.AcqInfo{n},n);
+        Data = DataObj0.ReturnYafi2Data(ReconObj.AcqInfo{1});
     else
         % if ReconObj.UseExternalShift
         %     Data = DataObj0.ReturnDataSetWithExternalShift(ReconObj.AcqInfo{n},n,ReconObj.Shift);
@@ -145,7 +145,8 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     end
     % Image(abs(Image) < 0.01*max(abs(Image(:)))) = NaN;
     Image(abs(Image) < 0.0025*max(abs(Image(:)))) = NaN;
-    ImRat = abs(Image(:,:,:,:,:,2))./abs(Image(:,:,:,:,:,1));
+    ImRat = (Image(:,:,:,:,:,2))./(Image(:,:,:,:,:,1));
+    %ImRat = abs(Image(:,:,:,:,:,2))./abs(Image(:,:,:,:,:,1));
     ImRat(ImRat > 1) = NaN;
     TrRat = DataObj0.DataInfo.ExpPars.Sequence.tr2/DataObj0.DataInfo.ExpPars.Sequence.tr1;
     if ReconObj.ReturnType == 0

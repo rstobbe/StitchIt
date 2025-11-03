@@ -243,6 +243,21 @@ classdef SiemensStitchItDataObject < handle
             QDataInfo = uint64([QDataReadSize QDataStart QDataCol QDataCha QDataBlockLength]);
             Data = 1000 * BuildComplexDataArray([obj.DataPath,obj.DataFile],QDataMemPosArr,QDataInfo);
             Data = permute(Data,[2 1 3]);       % for now
+        end   
+
+%==================================================================
+% ReturnPreSampDataPlusTwenty
+%================================================================== 
+    function Data = ReturnPreSampDataPlusTwenty(obj,AcqInfo,ReconNumber)
+            QDataMemPosArr = uint64(obj.DataMem.Pos(:) + obj.DataScanHeaderBytes);                                  
+            QDataReadSize = obj.DataChannelHeaderBytes/8 + obj.DataDims.NCol;
+            QDataStart = obj.DataChannelHeaderBytes/8;
+            QDataCol =  AcqInfo.SampStart + 20;
+            QDataCha = obj.DataDims.NCha;
+            QDataBlockLength = length(obj.DataMem.Pos);
+            QDataInfo = uint64([QDataReadSize QDataStart QDataCol QDataCha QDataBlockLength]);
+            Data = 1000 * BuildComplexDataArray([obj.DataPath,obj.DataFile],QDataMemPosArr,QDataInfo);
+            Data = permute(Data,[2 1 3]);       % for now
         end         
 
 %==================================================================

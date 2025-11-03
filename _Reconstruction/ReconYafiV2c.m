@@ -153,7 +153,8 @@ function [Image,err] = CreateImage(ReconObj,DataObjArr)
     Mask = zeros(size(Image));
     Mask(MeanImage < ReconObj.MaskVal*max(MeanImage(:))) = 1;
     ImageMasked(logical(Mask)) = NaN;
-    ImRat = abs(ImageMasked(:,:,:,:,:,2))./abs(ImageMasked(:,:,:,:,:,1));
+    % ImRat = abs(ImageMasked(:,:,:,:,:,2))./abs(ImageMasked(:,:,:,:,:,1));
+    ImRat = (ImageMasked(:,:,:,:,:,2))./(ImageMasked(:,:,:,:,:,1));
     ImRat(ImRat > 1) = NaN;
     TrRat = DataObj0.DataInfo.ExpPars.Sequence.tr2/DataObj0.DataInfo.ExpPars.Sequence.tr1;
     if ReconObj.ReturnType == 0
