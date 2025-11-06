@@ -1,12 +1,12 @@
 %==================================================================
-% (3d)
-%   - PCA considerations
+% (3e)
+%   - same as 3d (Cps wrapper has no flip)
 %==================================================================
 
-classdef TrajMashLungEndExp3d < matlab.mixin.Copyable
+classdef TrajMashLungEndExp3e < matlab.mixin.Copyable
 
 properties (SetAccess = private)                   
-    Method = 'TrajMashLungEndExp3d'
+    Method = 'TrajMashLungEndExp3e'
     % Selectable
     StartSkip = 1            % Trajectories to skip (steady-state)
     DispFigs = 1                % 0 = no figures; 1 = basic; 2 = verbose
@@ -40,6 +40,7 @@ properties (SetAccess = private)
     FilterTime
     AtExpirationPeriFrac
     TrajMashNum
+    Empty
 end
 
 methods 
@@ -47,7 +48,7 @@ methods
 %==================================================================
 % Constructor
 %==================================================================  
-function TrajMashObj = TrajMashLungEndExp3d()              
+function TrajMashObj = TrajMashLungEndExp3e()              
     TrajMashObj.DispStatObj = DisplayStatusObject();
 end
 
@@ -87,7 +88,11 @@ function CreateNavigatorWaveform(TrajMashObj,k0)
     %------------------------------------------------
     TrajMashObj.FilterTime = 1000;          % starting filter time
     TrajMashObj.Filter;
-    TrajMashObj.PeakFinder;
+    PeakFindSensitivityInit = TrajMashObj.PeakFindSensitivity - 3;
+    if PeakFindSensitivityInit < 1
+        PeakFindSensitivityInit = 1;
+    end
+    TrajMashObj.PeakFinder(PeakFindSensitivityInit);
     if TrajMashObj.DispFigs > 1
         TrajMashObj.PlotNavigator(2000 + TrajMashObj.TrajMashNum);
         title('Starting Navigator');
@@ -100,7 +105,7 @@ function CreateNavigatorWaveform(TrajMashObj,k0)
     TrajMashObj.MedianPeaksDiff = median(PeaksDiff);
     TrajMashObj.FilterTime = TrajMashObj.MedianPeaksDiff*TrajMashObj.TR/2;
     TrajMashObj.Filter;
-    TrajMashObj.PeakFinder;
+    TrajMashObj.PeakFinder(TrajMashObj.PeakFindSensitivity);
     if TrajMashObj.DispFigs > 0
         TrajMashObj.PlotNavigator(3000 + TrajMashObj.TrajMashNum);
         title('Navigator');
@@ -115,8 +120,8 @@ function CreateNavigatorWaveform(TrajMashObj,k0)
         title('Navigator + UsedTrajs');
     end
     TrajMashObj.WeightTrajectories;
-    if TrajMashObj.DispFigs > 1
-        figure(3000 + TrajMashObj.TrajMashNum); clf; hold on; 
+    if TrajMashObj.DispFigs > 2
+        figure(4000 + TrajMashObj.TrajMashNum); clf; hold on; 
         plot(TrajMashObj.SumWeightOut);
         ylim([0 TrajMashObj.NumAverages]);
         title('Averages Used Per Trajectory')
@@ -139,14 +144,17 @@ function Filter(TrajMashObj)
     if size(PcaNavSig,2) == 1
         TrajMashObj.NavSig = single(PcaNavSig);
     else
-        for n = 1:2
-            Pxx(n) = max(pwelch(PcaNavSig(:,n+1)));
+        for n = 1:6
+            PcaNavSig(:,n) = PcaNavSig(:,n) - mean(PcaNavSig(:,n));
+            %figure(10000); subplot(2,3,n); plot(PcaNavSig(:,n));
+        end
+        for n = 1:6
+            Test = pwelch(PcaNavSig(:,n));
+            %figure(20000); subplot(2,3,n); plot(Test(6:40));
+            Pxx(n) = max(Test(6:end));
         end
         ind = find(Pxx == max(Pxx));
-        TrajMashObj.NavSig = single(PcaNavSig(:,ind+1));
-        if ind == 2
-            DoFlip = not(TrajMashObj.Flip);
-        end
+        TrajMashObj.NavSig = single(PcaNavSig(:,ind));
     end
     if DoFlip
         TrajMashObj.NavSig = max(TrajMashObj.NavSig)*10 - TrajMashObj.NavSig;
@@ -156,23 +164,23 @@ end
 %==================================================================
 % PeakFinder
 %================================================================== 
-function PeakFinder(TrajMashObj)
+function PeakFinder(TrajMashObj,PeakFindSensitivityVal)
     UsedNavSig = TrajMashObj.NavSig(TrajMashObj.StartSkip:end);
-    if TrajMashObj.PeakFindSensitivity == 1
+    if PeakFindSensitivityVal == 1
         Sel = (max(UsedNavSig)-min(UsedNavSig))/3.5;
-    elseif TrajMashObj.PeakFindSensitivity == 2 
+    elseif PeakFindSensitivityVal == 2 
         Sel = (max(UsedNavSig)-min(UsedNavSig))/5;
-    elseif TrajMashObj.PeakFindSensitivity == 3 
+    elseif PeakFindSensitivityVal == 3 
         Sel = (max(UsedNavSig)-min(UsedNavSig))/7;
-    elseif TrajMashObj.PeakFindSensitivity == 4 
+    elseif PeakFindSensitivityVal == 4 
         Sel = (max(UsedNavSig)-min(UsedNavSig))/10;
-    elseif TrajMashObj.PeakFindSensitivity == 5 
+    elseif PeakFindSensitivityVal == 5 
         Sel = (max(UsedNavSig)-min(UsedNavSig))/14;
-    elseif TrajMashObj.PeakFindSensitivity == 6 
+    elseif PeakFindSensitivityVal == 6 
         Sel = (max(UsedNavSig)-min(UsedNavSig))/20;
-    elseif TrajMashObj.PeakFindSensitivity == 7 
+    elseif PeakFindSensitivityVal == 7 
         Sel = (max(UsedNavSig)-min(UsedNavSig))/28;
-    elseif TrajMashObj.PeakFindSensitivity == 8 
+    elseif PeakFindSensitivityVal == 8 
         Sel = (max(UsedNavSig)-min(UsedNavSig))/40;
     end
     TrajMashObj.Peaks = peakfinder(TrajMashObj.NavSig,Sel);
@@ -224,11 +232,13 @@ function DetermineTraj2Use(TrajMashObj)
             end
             Test(m) = sum(TrajMashObj.NavSig(logical(TrajMashObj.ExpInds)));
         end
-        if Test(m) == 0
+        if sum(Test) == 0
             TrajMashObj.ShiftPct(n) = 0;
+            TrajMashObj.Empty(n) = 1;
         else
             ind = find(Test == min(Test),1);
             TrajMashObj.ShiftPct(n) = ShiftPctArr(ind);
+            TrajMashObj.Empty(n) = 0;
         end
     end
 
@@ -237,22 +247,54 @@ function DetermineTraj2Use(TrajMashObj)
     %------------------------------------------------
     ShiftPctArr = -0.3:0.001:0.3;
     for n = 2:length(TrajMashObj.Peaks)
-        for m = 1:length(ShiftPctArr)
-            PeriShift(m) = round(RespPts * ShiftPctArr(m));
-            Shift = round(RespPts * TrajMashObj.ShiftPct(n));
-            TrajMashObj.PeriExpInds = zeros(TrajMashObj.NumAcqs,1);
-            TrajMashObj.PeriExpInds(PeriShift(m)+TrajMashObj.Peaks(n-1)+PeriRiseFallRespPts:Shift+TrajMashObj.Peaks(n-1)+RiseFallRespPts-1) = 1;
-            TrajMashObj.PeriExpInds(Shift+TrajMashObj.Peaks(n)-RiseFallRespPts+1:PeriShift(m)+TrajMashObj.Peaks(n)-PeriRiseFallRespPts) = 1;
-            if length(TrajMashObj.PeriExpInds) > TrajMashObj.NumAcqs
-                TrajMashObj.PeriExpInds = TrajMashObj.PeriExpInds(1:TrajMashObj.NumAcqs);
+        if TrajMashObj.Empty(n)
+            Test = [];
+            for m = 1:length(ShiftPctArr)
+                Shift = round(RespPts * ShiftPctArr(m));
+                TrajMashObj.ExpInds = zeros(TrajMashObj.NumAcqs,1);
+                TrajMashObj.ExpInds(Shift+(TrajMashObj.Peaks(n-1)+PeriRiseFallRespPts:TrajMashObj.Peaks(n)-PeriRiseFallRespPts)) = 1;
+                if length(TrajMashObj.ExpInds) > length(TrajMashObj.NavSig)
+                    TrajMashObj.ExpInds = TrajMashObj.ExpInds(1:length(TrajMashObj.NavSig));
+                    Test(m) = 1e9;
+                    break
+                end
+                Test(m) = sum(TrajMashObj.NavSig(logical(TrajMashObj.ExpInds)));
             end
-            Test(m) = sum(TrajMashObj.NavSig(logical(TrajMashObj.PeriExpInds)));
-        end
-        if Test(m) == 0
-            TrajMashObj.PeriShiftPct(n) = 0;
+            if sum(Test) == 0
+                TrajMashObj.PeriShiftPct(n) = 0;
+            else
+                ind = find(Test == min(Test),1);
+                TrajMashObj.PeriShiftPct(n) = ShiftPctArr(ind);
+            end
         else
-            ind = find(Test == min(Test),1);
-            TrajMashObj.PeriShiftPct(n) = ShiftPctArr(ind);
+            Test = NaN*ones(length(ShiftPctArr),1);
+            Shift = round(RespPts * TrajMashObj.ShiftPct(n));
+            StartOfRed = Shift+TrajMashObj.Peaks(n-1)+RiseFallRespPts-1;
+            EndOfRed = Shift+TrajMashObj.Peaks(n)-RiseFallRespPts+1;
+            for m = 1:length(ShiftPctArr)
+                PeriShift = round(RespPts * ShiftPctArr(m));
+                StartOfGreen = PeriShift+TrajMashObj.Peaks(n-1)+PeriRiseFallRespPts;
+                EndOfGreen = PeriShift+TrajMashObj.Peaks(n)-PeriRiseFallRespPts;
+                if StartOfGreen > StartOfRed
+                    continue
+                end
+                if EndOfGreen < EndOfRed
+                    continue
+                end
+                TrajMashObj.PeriExpInds = zeros(TrajMashObj.NumAcqs,1);
+                TrajMashObj.PeriExpInds(StartOfGreen:StartOfRed) = 1;
+                TrajMashObj.PeriExpInds(EndOfRed:EndOfGreen) = 1;
+                if length(TrajMashObj.PeriExpInds) > TrajMashObj.NumAcqs
+                    TrajMashObj.PeriExpInds = TrajMashObj.PeriExpInds(1:TrajMashObj.NumAcqs);
+                end
+                Test(m) = sum(TrajMashObj.NavSig(logical(TrajMashObj.PeriExpInds))+1);                      % make sure positive
+            end
+            if isnan(min(Test))
+                TrajMashObj.PeriShiftPct(n) = 0;
+            else
+                ind = find(Test == min(Test),1);
+                TrajMashObj.PeriShiftPct(n) = ShiftPctArr(ind);
+            end
         end
     end
 
@@ -262,8 +304,12 @@ function DetermineTraj2Use(TrajMashObj)
         Shift = round(RespPts * TrajMashObj.ShiftPct(n));
         TrajMashObj.ExpInds(Shift+(TrajMashObj.Peaks(n-1)+RiseFallRespPts:TrajMashObj.Peaks(n)-RiseFallRespPts)) = 1;
         PeriShift = round(RespPts * TrajMashObj.PeriShiftPct(n));
-        TrajMashObj.PeriExpInds(PeriShift+TrajMashObj.Peaks(n-1)+PeriRiseFallRespPts:Shift+TrajMashObj.Peaks(n-1)+RiseFallRespPts-1) = 1;
-        TrajMashObj.PeriExpInds(Shift+TrajMashObj.Peaks(n)-RiseFallRespPts+1:PeriShift+TrajMashObj.Peaks(n)-PeriRiseFallRespPts) = 1;
+        if TrajMashObj.Empty(n)
+            TrajMashObj.PeriExpInds(PeriShift+(TrajMashObj.Peaks(n-1)+PeriRiseFallRespPts:TrajMashObj.Peaks(n)-PeriRiseFallRespPts)) = 1;
+        else
+            TrajMashObj.PeriExpInds(PeriShift+TrajMashObj.Peaks(n-1)+PeriRiseFallRespPts:Shift+TrajMashObj.Peaks(n-1)+RiseFallRespPts-1) = 1;
+            TrajMashObj.PeriExpInds(Shift+TrajMashObj.Peaks(n)-RiseFallRespPts+1:PeriShift+TrajMashObj.Peaks(n)-PeriRiseFallRespPts) = 1;
+        end
         if length(TrajMashObj.PeriExpInds) > TrajMashObj.NumAcqs
             TrajMashObj.PeriExpInds = TrajMashObj.PeriExpInds(1:TrajMashObj.NumAcqs);
         end
