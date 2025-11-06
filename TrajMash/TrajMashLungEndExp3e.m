@@ -104,6 +104,9 @@ function CreateNavigatorWaveform(TrajMashObj,k0)
     PeaksDiff = diff(TrajMashObj.Peaks);
     TrajMashObj.MedianPeaksDiff = median(PeaksDiff);
     TrajMashObj.FilterTime = TrajMashObj.MedianPeaksDiff*TrajMashObj.TR/2;
+    %
+    TrajMashObj.FilterTime = TrajMashObj.FilterTime*0.75;
+    %
     TrajMashObj.Filter;
     TrajMashObj.PeakFinder(TrajMashObj.PeakFindSensitivity);
     if TrajMashObj.DispFigs > 0
@@ -285,7 +288,7 @@ function DetermineTraj2Use(TrajMashObj)
                 TrajMashObj.PeriExpInds(StartOfGreen:StartOfRed) = 1;
                 TrajMashObj.PeriExpInds(EndOfRed:EndOfGreen) = 1;
                 if length(TrajMashObj.PeriExpInds) > TrajMashObj.NumAcqs
-                    TrajMashObj.PeriExpInds = TrajMashObj.PeriExpInds(1:TrajMashObj.NumAcqs);
+                    TrajMashObj.PeriExpInds = ones(1,TrajMashObj.NumAcqs);
                 end
                 Test(m) = sum(TrajMashObj.NavSig(logical(TrajMashObj.PeriExpInds))+1);                      % make sure positive
             end
