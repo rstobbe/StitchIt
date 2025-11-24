@@ -63,7 +63,7 @@ ExpPars.Sequence.SarScale = test1{25};
 %---------------------------------------------
 ExpPars.scantime = MrProt.lTotalScanTimeSec;
 for n = 1:ExpPars.Sequence.NumImages   
-    ExpPars.Sequence.flip(n) = test1{29+n};
+    ExpPars.Sequence.flip(n) = test1{29+n}/1000;
     ExpPars.Sequence.rfpulselen(n) = test1{11+n};
     ExpPars.Sequence.tr(n) = MrProt.alTR{n}/1e3; 
     ExpPars.Sequence.te(n) = MrProt.alTE{n}/1e3;
